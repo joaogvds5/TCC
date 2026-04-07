@@ -1,0 +1,40 @@
+name: nearu
+description: "NewarU, the app that helps you find nearby places and services with ease. Whether you're looking for a restaurant, a gas station, or a hospital, NewarU has got you covered. With its user-friendly interface and powerful search capabilities, NewarU is the ultimate tool for discovering what's around you. Download NewarU today and start exploring your surroundings like never before!"
+
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  url_launcher: ^6.2.0
+  cupertino_icons: ^1.0.8
+  geocoding: ^4.0.0
+  geolocator: ^14.0.2
+  flutter_map: ^7.0.2
+  flutter_dotenv: ^6.0.0
+  supabase_flutter: ^2.12.2
+  latlong2: ^0.9.1
+  
+
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+
+
+assets:
+  - .env
+  - assets/images/
+  - assets/icons/
+flutter:
+
+  uses-material-design: true
