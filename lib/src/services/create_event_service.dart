@@ -14,19 +14,26 @@ class CreateEventService {
     final user = _supabaseClient.auth.currentUser;
 
     if (session == null || user == null) {
-      throw Exception('Usuário não autenticado');
+      if (_supabaseClient.auth.currentUser == null) {
+        throw Exception("Usuário não autenticado");
+      }
+      return false;
     }
 
-    await _supabaseClient.from('events').insert({
-      'title': title,
-      'description': description,
-      'category': category,
-      'latitude': latitude,
-      'longitude': longitude,
-      'user_id': user.id,
-      'created_at': DateTime.now().toIso8601String(),
-    });
+    try {
+      await _supabaseClient.from('events').insert({
+        'title': title,
+        'description': description,
+        'interest_category': category,
+        'latitude_event': latitude.toString(),
+        'longitude_event': longitude.toString(),
+        'user_creator': user.id,
+        'photo_event': '',
+      });
 
-    return true;
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 }
