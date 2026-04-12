@@ -1,55 +1,80 @@
 import 'package:flutter/material.dart';
+import 'package:nearu/src/services/login_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
   @override
-  State<LoginPage> createState() => _LoginScreenState();
+  State<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginScreenState extends State<LoginPage> {
+class _LoginPageState extends State<LoginPage> {
   bool _isPasswordVisible = false;
 
-  final Color _primaryColor = const Color.fromARGB(255, 5, 5, 12);
-  final Color _darkTextColor = const Color.fromARGB(255, 0, 0, 0);
-  final Color _bodyTextColor = const Color.fromARGB(255, 65, 61, 135);
-  final Color _borderColor = const Color.fromARGB(255, 165, 163, 205);
-  final Color _bgLight = const Color.fromARGB(255, 107, 103, 166);
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+
+  final Color primaryColor = const Color(0xFF0A0A23);
+  final Color backgroundColor = const Color(0xFFEDEBFF);
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _bgLight,
+      backgroundColor: backgroundColor,
       body: Stack(
         children: [
-          _Backgrounddecoration(color: _primaryColor),
-
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _LoginHeader(darkColor: _darkTextColor, bodyColor: _bgLight),
+                  const SizedBox(height: 60),
+
+                  const Text(
+                    "Bem-vindo!",
+                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+                  ),
+
+                  const SizedBox(height: 8),
 
                   const SizedBox(height: 40),
 
-                  _LoginFormFields(
-                    primaryColor: _primaryColor,
-                    darkColor: _darkTextColor,
-                    borderColor: _borderColor,
-                    bodyColor: _bodyTextColor,
-                    isPasswordVisible: _isPasswordVisible,
-                    onTogglePassword: () {
-                      setState(() {
-                        _isPasswordVisible = !_isPasswordVisible;
-                      });
-                    },
+                  _inputField(
+                    controller: emailController,
+                    hint: "Digite seu e-mail",
+                    icon: Icons.email,
                   ),
 
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 20),
 
-                  _LoginButton(primaryColor: _primaryColor),
+                  _inputField(
+                    controller: passwordController,
+                    hint: "Digite sua senha",
+                    icon: Icons.lock,
+                    isPassword: true,
+                  ),
+
+                  const SizedBox(height: 25),
+
+                  _loginButton(),
+
+                  const SizedBox(height: 25),
+
+                  _divider(),
+
+                  const SizedBox(height: 20),
+
+                  _socialButtons(),
+
+                  const Spacer(),
                 ],
               ),
             ),
@@ -58,142 +83,123 @@ class _LoginScreenState extends State<LoginPage> {
       ),
     );
   }
-}
 
-class _Backgrounddecoration extends StatelessWidget {
-  final Color color;
+  // ================= UI COMPONENTS =================
 
-  const _Backgrounddecoration({required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Positioned(top: -80, left: -60, child: _blob(280, color)),
-        Positioned(bottom: -80, right: -60, child: _blob(230, color)),
-      ],
-    );
-  }
-
-  Widget _blob(double size, Color color) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color.withOpacity(0.15),
-      ),
-    );
-  }
-}
-
-class _LoginHeader extends StatelessWidget {
-  final Color darkColor, bodyColor;
-
-  const _LoginHeader({required this.darkColor, required this.bodyColor});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 70),
-
-        Text(
-          "Bem Vindo!",
-          style: TextStyle(
-            fontSize: 34,
-            fontWeight: FontWeight.w800,
-            color: darkColor,
-          ),
-        ),
-
-        const SizedBox(height: 5),
-
-        Text(
-          "Entre com suas credenciais",
-          style: TextStyle(fontSize: 16, color: darkColor),
-        ),
-      ],
-    );
-  }
-}
-
-class _LoginFormFields extends StatelessWidget {
-  final Color primaryColor, darkColor, bodyColor, borderColor;
-  final bool isPasswordVisible;
-  final VoidCallback onTogglePassword;
-
-  const _LoginFormFields({
-    required this.primaryColor,
-    required this.darkColor,
-    required this.borderColor,
-    required this.bodyColor,
-    required this.isPasswordVisible,
-    required this.onTogglePassword,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _inputField(Icons.email, "Digite seu e-mail"),
-
-        const SizedBox(height: 20),
-
-        _inputField(
-          Icons.lock,
-          "Digite sua senha",
-          isPassword: true,
-          suffix: GestureDetector(
-            onTap: onTogglePassword,
-            child: Icon(
-              isPasswordVisible ? Icons.visibility : Icons.visibility_off,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _inputField(
-    IconData icon,
-    String hint, {
+  Widget _inputField({
+    required TextEditingController controller,
+    required String hint,
+    required IconData icon,
     bool isPassword = false,
-    Widget? suffix,
   }) {
     return TextField(
-      obscureText: isPassword && !isPasswordVisible,
+      controller: controller,
+      obscureText: isPassword && !_isPasswordVisible,
       decoration: InputDecoration(
-        prefixIcon: Icon(icon),
-        suffixIcon: suffix,
         hintText: hint,
+        prefixIcon: Icon(icon),
+        suffixIcon: isPassword
+            ? IconButton(
+                icon: Icon(
+                  _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _isPasswordVisible = !_isPasswordVisible;
+                  });
+                },
+              )
+            : null,
         filled: true,
         fillColor: Colors.white,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
+        ),
       ),
     );
   }
-}
 
-class _LoginButton extends StatelessWidget {
-  final Color primaryColor;
+  Widget _loginButton() {
+    return GestureDetector(
+      onTap: () async {
+        if (emailController.text.isEmpty || passwordController.text.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Preencha todos os campos')),
+          );
+          return;
+        }
 
-  const _LoginButton({required this.primaryColor});
+        final result = await LoginService().login(
+          emailController.text,
+          passwordController.text,
+        );
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 18),
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: primaryColor,
-        borderRadius: BorderRadius.circular(16),
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(result.message)));
+
+        if (result.success) {
+          Navigator.pop(context);
+        }
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        decoration: BoxDecoration(
+          color: primaryColor,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        alignment: Alignment.center,
+        child: const Text(
+          "Entrar",
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
       ),
-      child: const Text(
-        "Entrar",
-        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+    );
+  }
+
+  Widget _divider() {
+    return Row(
+      children: const [
+        Expanded(child: Divider()),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 10),
+          child: Text("Não possui conta?"),
+        ),
+        Expanded(child: Divider()),
+      ],
+    );
+  }
+
+  Widget _socialButtons() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        _socialButton("Google", Icons.g_mobiledata),
+        const SizedBox(width: 10),
+
+        _socialButton("GitHub", Icons.code),
+      ],
+    );
+  }
+
+  Widget _socialButton(String text, IconData icon) {
+    return Expanded(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 5),
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [Icon(icon), const SizedBox(width: 8), Text(text)],
+        ),
       ),
     );
   }
