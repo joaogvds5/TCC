@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:nearu/src/screens/login_screen.dart';
 import 'package:nearu/src/services/create_event_service.dart';
-import 'package:nearu/src/services/get_location.dart' as getLocation;
+import 'package:nearu/src/services/get_location.dart' as get_location;
 
 class AddEventWidget extends StatefulWidget {
   const AddEventWidget({super.key});
@@ -14,6 +15,7 @@ class _AddEventWidgetState extends State<AddEventWidget> {
   final TextEditingController descriptionController = TextEditingController();
 
   String selectedCategory = 'Evento';
+  bool isLoading = false;
 
   final List<String> categories = [
     'Evento',
@@ -28,6 +30,67 @@ class _AddEventWidgetState extends State<AddEventWidget> {
     titleController.dispose();
     descriptionController.dispose();
     super.dispose();
+  }
+
+  Future<void> _createEvent() async {
+    // 🔴 Validação
+    if (titleController.text.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Digite um título')));
+      return;
+    }
+
+    setState(() => isLoading = true);
+
+    try {
+      // 📍 Localização
+      final position = await get_location.currentPosition();
+
+      final success = await CreateEventService().createEvent(
+        title: titleController.text,
+        description: descriptionController.text,
+        category: selectedCategory,
+        latitude: position.latitude,
+        longitude: position.longitude,
+      );
+
+      if (!mounted) return;
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Evento criado com sucesso!')),
+        );
+
+        Navigator.pop(context);
+      } else {
+        // Aqui pode ser erro de auth OU outro erro
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Erro ao criar evento')));
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      // 🔐 Erro de autenticação
+      if (e.toString().contains("Usuário não autenticado")) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Faça login para criar eventos')),
+        );
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+        );
+      } else {
+        // 🌍 erro geral (ex: localização, rede, etc)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erro inesperado ao criar evento')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
   }
 
   @override
@@ -50,6 +113,7 @@ class _AddEventWidgetState extends State<AddEventWidget> {
 
             const SizedBox(height: 20),
 
+            // 📌 Título
             TextField(
               controller: titleController,
               decoration: const InputDecoration(
@@ -60,6 +124,7 @@ class _AddEventWidgetState extends State<AddEventWidget> {
 
             const SizedBox(height: 15),
 
+            // 📌 Descrição
             TextField(
               controller: descriptionController,
               maxLines: 3,
@@ -71,6 +136,7 @@ class _AddEventWidgetState extends State<AddEventWidget> {
 
             const SizedBox(height: 15),
 
+            // 📌 Categoria
             DropdownButtonFormField<String>(
               initialValue: selectedCategory,
               items: categories.map((item) {
@@ -89,47 +155,18 @@ class _AddEventWidgetState extends State<AddEventWidget> {
 
             const SizedBox(height: 20),
 
+            // 🔘 Botão
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () async {
-                  print('Título: ${titleController.text}');
-                  print('Descrição: ${descriptionController.text}');
-                  print('Categoria: $selectedCategory');
-
-                  // Call the service to create the event
-                  final createEventService = CreateEventService();
-                  createEventService
-                      .createEvent(
-                        title: titleController.text,
-                        description: descriptionController.text,
-                        category: selectedCategory,
-                        latitude: await getLocation.currentPosition().then(
-                          (position) => position.latitude,
-                        ),
-                        longitude: await getLocation.currentPosition().then(
-                          (position) => position.longitude,
-                        ),
+                onPressed: isLoading ? null : _createEvent,
+                child: isLoading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                      .then((success) {
-                        if (success) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Evento criado com sucesso!'),
-                            ),
-                          );
-                          Navigator.pop(context);
-                        }
-                      })
-                      .catchError((error) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Erro ao criar evento.'),
-                          ),
-                        );
-                      });
-                },
-                child: const Text('Criar Evento'),
+                    : const Text('Criar Evento'),
               ),
             ),
           ],
