@@ -1,6 +1,16 @@
-import 'package:supabase_flutter/supabase_flutter.dart ';
+import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:nearu/src/models/event.dart';
 import 'package:nearu/src/services/create_event_service.dart';
+
+// Exceção personalizada
+class UnauthenticatedException implements Exception {
+  final String message;
+  UnauthenticatedException([this.message = "Usuário não autenticado"]);
+
+  @override
+  String toString() => message;
+}
 
 class EventController {
   final EventService _service = EventService();
@@ -16,7 +26,7 @@ class EventController {
       final user = Supabase.instance.client.auth.currentUser;
 
       if (user == null) {
-        throw Exception("Usuário não autenticado");
+        throw UnauthenticatedException("Usuário não autenticado");
       }
 
       final event = Event(
@@ -30,9 +40,13 @@ class EventController {
       );
 
       await _service.createEvent(event);
-
       return true;
+    } on UnauthenticatedException {
+      // REPROPAGA a exceção para o widget tratar
+      rethrow;
     } catch (e) {
+      // Outros erros retornam false
+      debugPrint('Erro ao criar evento: $e');
       return false;
     }
   }
