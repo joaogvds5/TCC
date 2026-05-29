@@ -1,87 +1,176 @@
 import 'package:flutter/material.dart';
+import 'package:nearu/src/widgets/map_marker_style.dart';
 
+/// Widget que renderiza um marcador no mapa
 class MapMarkerWidget extends StatelessWidget {
   final String title;
   final String description;
-  final String category;
+  final int categoryId;
+  final double heat;
+  final VoidCallback? onTap;
 
   const MapMarkerWidget({
     super.key,
     required this.title,
     required this.description,
-    required this.category,
+    required this.categoryId,
+    required this.heat,
+    this.onTap,
   });
-
-  IconData _getCategoryIcon() {
-    switch (category.toLowerCase()) {
-      case 'música':
-        return Icons.music_note;
-
-      case 'esporte':
-        return Icons.sports_soccer;
-
-      case 'feira':
-        return Icons.storefront;
-
-      case 'tecnologia':
-        return Icons.computer;
-
-      case 'evento':
-      default:
-        return Icons.location_pin;
-    }
-  }
-
-  Color _getCategoryColor() {
-    switch (category.toLowerCase()) {
-      case 'música':
-        return Colors.purple;
-
-      case 'esporte':
-        return Colors.green;
-
-      case 'feira':
-        return Colors.orange;
-
-      case 'tecnologia':
-        return Colors.blue;
-
-      case 'evento':
-      default:
-        return Colors.red;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(_getCategoryIcon(), color: _getCategoryColor(), size: 40),
+    final categoryColor = MapMarkerStyle.getCategoryColor(categoryId);
+    final heatOpacity = MapMarkerStyle.getHeatOpacity(heat);
+    final categoryName = MapMarkerStyle.getCategoryName(categoryId);
+    final categoryIcon = MapMarkerStyle.getCategoryIcon(categoryId);
 
-        Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: const [
-              BoxShadow(
-                blurRadius: 4,
-                color: Colors.black26,
-                offset: Offset(0, 2),
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Card principal
+          Container(
+            width: MapMarkerStyle.markerWidth,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: MapMarkerStyle.cardBackground,
+              borderRadius: BorderRadius.circular(MapMarkerStyle.borderRadius),
+              boxShadow: [
+                BoxShadow(
+                  color: MapMarkerStyle.shadowColor.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+              border: Border.all(
+                color: categoryColor.withValues(alpha: 0.5),
+                width: 1.5,
               ),
-            ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Cabeçalho: ícone + categoria + badge de calor
+                Row(
+                  children: [
+                    // Ícone da categoria
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: categoryColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Icon(categoryIcon, size: 16, color: categoryColor),
+                    ),
+                    const SizedBox(width: 6),
+
+                    // Nome da categoria
+                    Expanded(
+                      child: Text(
+                        categoryName,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: categoryColor,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+
+                    // Badge de calor (se houver mais de 1 evento)
+                    if (heat > 0.1)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: MapMarkerStyle.heatBadgeColor.withValues(
+                            alpha: heatOpacity,
+                          ),
+                          borderRadius: BorderRadius.circular(
+                            MapMarkerStyle.heatBadgeRadius,
+                          ),
+                        ),
+                        child: Text(
+                          '🔥 ${(heat * 10).round()}',
+                          style: const TextStyle(
+                            fontSize: MapMarkerStyle.heatFontSize,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+
+                const SizedBox(height: 6),
+
+                // Título
+                Text(
+                  title,
+                  maxLines: MapMarkerStyle.titleMaxLines,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: MapMarkerStyle.titleFontSize,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+
+                // Descrição (se existir)
+                if (description.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    description,
+                    maxLines: MapMarkerStyle.descriptionMaxLines,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: MapMarkerStyle.descriptionFontSize,
+                      color: Colors.grey.shade600,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              Text(description),
-            ],
+
+          // Seta/pino apontando para baixo
+          CustomPaint(
+            size: const Size(20, 10),
+            painter: _MarkerTrianglePainter(color: categoryColor),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
+}
+
+/// Pinta o triângulo inferior do marcador
+class _MarkerTrianglePainter extends CustomPainter {
+  final Color color;
+
+  _MarkerTrianglePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color.withValues(alpha: 0.7)
+      ..style = PaintingStyle.fill;
+
+    final path = Path()
+      ..moveTo(size.width / 2, size.height) // ponta inferior
+      ..lineTo(0, 0) // canto superior esquerdo
+      ..lineTo(size.width, 0) // canto superior direito
+      ..close();
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:nearu/src/controllers/event_controller.dart';
 import 'package:nearu/src/screens/login_screen.dart';
-import 'package:nearu/src/services/create_event_service.dart';
 import 'package:nearu/src/services/get_location.dart' as get_location;
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:nearu/src/controllers/event_controller.dart';
+// UnauthenticatedException já vem junto com esse import
 
 class AddEventWidget extends StatefulWidget {
   const AddEventWidget({super.key});
@@ -10,20 +13,30 @@ class AddEventWidget extends StatefulWidget {
   State<AddEventWidget> createState() => _AddEventWidgetState();
 }
 
+class Category {
+  final int id;
+  final String name;
+
+  Category(this.id, this.name);
+}
+
 class _AddEventWidgetState extends State<AddEventWidget> {
   final TextEditingController titleController = TextEditingController();
   final TextEditingController descriptionController = TextEditingController();
 
-  String selectedCategory = 'Evento';
+  final EventController controller = EventController();
+
   bool isLoading = false;
 
-  final List<String> categories = [
-    'Evento',
-    'Música',
-    'Esporte',
-    'Feira',
-    'Tecnologia',
+  final List<Category> categories = [
+    Category(1, 'Evento'),
+    Category(2, 'Música'),
+    Category(3, 'Esporte'),
+    Category(4, 'Feira'),
+    Category(5, 'Tecnologia'),
   ];
+
+  late Category selectedCategory = categories.first;
 
   @override
   void dispose() {
@@ -33,24 +46,20 @@ class _AddEventWidgetState extends State<AddEventWidget> {
   }
 
   Future<void> _createEvent() async {
-    // 🔴 Validação
     if (titleController.text.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Digite um título')));
+      _showMessage('Digite um título');
       return;
     }
 
     setState(() => isLoading = true);
 
     try {
-      // 📍 Localização
       final position = await get_location.currentPosition();
 
-      final success = await CreateEventService().createEvent(
+      final success = await controller.createEvent(
         title: titleController.text,
         description: descriptionController.text,
-        category: selectedCategory,
+        categoryId: selectedCategory.id,
         latitude: position.latitude,
         longitude: position.longitude,
       );
@@ -58,39 +67,37 @@ class _AddEventWidgetState extends State<AddEventWidget> {
       if (!mounted) return;
 
       if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Evento criado com sucesso!')),
-        );
-
+        _showMessage('Evento criado com sucesso!');
         Navigator.pop(context);
       } else {
-        // Aqui pode ser erro de auth OU outro erro
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Erro ao criar evento')));
+        _showMessage('Erro ao criar evento');
       }
-    } catch (e) {
+    } on UnauthenticatedException {
+      // Captura específica para não autenticado
       if (!mounted) return;
 
-      // 🔐 Erro de autenticação
-      if (e.toString().contains("Usuário não autenticado")) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Faça login para criar eventos')),
-        );
+      _showMessage('Faça login para continuar');
 
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginPage()),
-        );
-      } else {
-        // 🌍 erro geral (ex: localização, rede, etc)
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erro inesperado ao criar evento')),
-        );
-      }
+      // Fecha o modal primeiro
+      Navigator.pop(context);
+
+      // Depois abre a tela de login
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage('Erro inesperado: ${e.toString()}');
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -113,7 +120,6 @@ class _AddEventWidgetState extends State<AddEventWidget> {
 
             const SizedBox(height: 20),
 
-            // 📌 Título
             TextField(
               controller: titleController,
               decoration: const InputDecoration(
@@ -124,7 +130,6 @@ class _AddEventWidgetState extends State<AddEventWidget> {
 
             const SizedBox(height: 15),
 
-            // 📌 Descrição
             TextField(
               controller: descriptionController,
               maxLines: 3,
@@ -136,11 +141,10 @@ class _AddEventWidgetState extends State<AddEventWidget> {
 
             const SizedBox(height: 15),
 
-            // 📌 Categoria
-            DropdownButtonFormField<String>(
-              initialValue: selectedCategory,
-              items: categories.map((item) {
-                return DropdownMenuItem(value: item, child: Text(item));
+            DropdownButtonFormField<Category>(
+              value: selectedCategory,
+              items: categories.map((cat) {
+                return DropdownMenuItem(value: cat, child: Text(cat.name));
               }).toList(),
               onChanged: (value) {
                 setState(() {
@@ -155,7 +159,6 @@ class _AddEventWidgetState extends State<AddEventWidget> {
 
             const SizedBox(height: 20),
 
-            // 🔘 Botão
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
