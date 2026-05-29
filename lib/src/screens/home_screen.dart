@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
-import 'package:nearu/src/services/get_location.dart' as getLocation;
+import 'package:nearu/src/controllers/home_controller.dart';
+import 'package:nearu/src/screens/profile_screen.dart';
+import 'package:nearu/src/screens/chats_screen.dart';
 import 'package:nearu/src/widgets/search_bar_widget.dart';
 import 'package:nearu/src/widgets/create_event_widget.dart';
-import 'package:nearu/src/widgets/map_marker_widget.dart';
+import 'package:nearu/src/widgets/map_view_widget.dart';
+import 'package:nearu/src/widgets/map_markers.dart';
+import 'package:nearu/src/widgets/profile_icon_widget.dart';
+import 'package:nearu/src/screens/login_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
@@ -15,142 +19,175 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  double? latitude;
-  double? longitude;
-
-  final MapController _mapController = MapController();
+  final HomeController controller = HomeController();
+  final MapController mapController = MapController();
   final TextEditingController searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _getCurrentLocation();
+    controller.init();
+    controller.addListener(_updateUI);
+  }
+
+  void _updateUI() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    controller.removeListener(_updateUI);
+    controller.dispose();
     searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _getCurrentLocation() async {
-    try {
-      final position = await getLocation.currentPosition();
-      setState(() {
-        latitude = position.latitude;
-        longitude = position.longitude;
-        print(
-          "Latitude: ${position.latitude}, Longitude: ${position.longitude}",
-        );
-      });
-    } catch (e) {
-      debugPrint("Erro localização: $e");
+  void _goToCurrentLocation() {
+    if (controller.latitude != null && controller.longitude != null) {
+      mapController.move(controller.currentLatLng, 15);
     }
   }
 
-  void _goToCurrentLocation() {
-    if (latitude != null && longitude != null) {
-      _mapController.move(LatLng(latitude!, longitude!), 15);
+  void _openChats() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const ChatsPage()),
+    );
+  }
+
+  void _openProfile() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const ProfileScreen()),
+    );
+  }
+
+  Future<void> _openCreateEvent() async {
+    // Verifica se está logado antes de abrir o modal
+    final isLoggedIn = Supabase.instance.client.auth.currentUser != null;
+
+    if (!isLoggedIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Faça login para criar eventos'),
+          backgroundColor: Colors.orange.shade700,
+          action: SnackBarAction(
+            label: 'Login',
+            textColor: Colors.white,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginPage()),
+              );
+            },
+          ),
+        ),
+      );
+      return;
     }
+
+    final result = await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => const AddEventWidget(),
+    );
+
+    // Recarrega eventos independente do resultado
+    controller.loadEvents();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (latitude == null || longitude == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
-    return Scaffold(
-      appBar: AppBar(title: const Text("Mapa"), centerTitle: true),
-      body: Stack(
-        children: [
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: LatLng(latitude!, longitude!),
-              initialZoom: 15,
-              onMapReady: _goToCurrentLocation,
-            ),
+    if (controller.isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.example.nearu',
-              ),
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: LatLng(latitude!, longitude!),
-                    width: 120,
-                    height: 100,
-                    child: const MapMarkerWidget(
-                      title: 'Show ao vivo',
-                      description: 'Hoje às 20h',
-                      category: 'Música',
-
-                      /*
-                      MapMarkerWidget(
-                      title: event.title,
-                      description: event.description,
-                      category: event.category,
-                    )
-                      */
-                    ),
-                  ),
-                ],
-              ),
-              RichAttributionWidget(
-                attributions: [
-                  TextSourceAttribution(
-                    'OpenStreetMap contributors',
-                    onTap: () {
-                      launchUrl(
-                        Uri.parse('https://openstreetmap.org/copyright'),
-                      );
-                    },
-                  ),
-                ],
-              ),
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text("Carregando mapa..."),
             ],
           ),
+        ),
+      );
+    }
 
+    final markers = MapMarkersBuilder.build(controller.clusters);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("NearU"),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Theme.of(context).primaryColor,
+        foregroundColor: Colors.white,
+
+        /// 👤 Perfil (esquerda)
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 8),
+          child: ProfileIconWidget(size: 36, onTap: _openProfile),
+        ),
+
+        /// 💬 Chat (direita)
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.chat_bubble_outline),
+            onPressed: _openChats,
+            tooltip: 'Chats',
+          ),
+          const SizedBox(width: 4),
+        ],
+      ),
+
+      body: Stack(
+        children: [
+          /// 🗺️ MAPA
+          MapView(
+            controller: mapController,
+            center: controller.currentLatLng,
+            markers: markers,
+          ),
+
+          /// 🔍 SEARCH BAR
           Positioned(
-            top: 15,
-            left: 15,
-            right: 15,
+            top: 16,
+            left: 16,
+            right: 16,
             child: SearchBarWidget(
-              hintText: "Pesquisar localização/evento/interesse",
+              hintText: "Pesquisar eventos...",
               controller: searchController,
             ),
           ),
-        ],
-      ),
 
-      //botão para criar evento, que abre um modal com campos para título, descrição (opcinal), local(getlocation), imagem(opcional), ícone da categoria do evento
-      // e por fim botão de confirmação
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          FloatingActionButton(
-            heroTag: 'add_event',
-            onPressed: () {
-              showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                builder: (context) => const AddEventWidget(),
-              );
-            },
-            child: const Icon(Icons.add),
-          ),
-          const SizedBox(height: 12),
-          FloatingActionButton(
-            heroTag: 'my_location',
-            onPressed: _goToCurrentLocation,
-            child: const Icon(Icons.my_location),
+          /// 📍 Botão de localização (sobre o mapa)
+          Positioned(
+            bottom: 16,
+            right: 16,
+            child: FloatingActionButton.small(
+              heroTag: 'location_mini',
+              onPressed: _goToCurrentLocation,
+              backgroundColor: Colors.white,
+              foregroundColor: Theme.of(context).primaryColor,
+              child: const Icon(Icons.my_location),
+            ),
           ),
         ],
       ),
 
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      /// ➕ Botão de criar evento
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'add_event',
+        onPressed: _openCreateEvent,
+        backgroundColor: Theme.of(context).primaryColor,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add),
+        label: const Text('Criar Evento'),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 }
