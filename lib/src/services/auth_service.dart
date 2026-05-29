@@ -1,4 +1,6 @@
+// lib/src/services/auth_service.dart
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/material.dart';
 
 class AuthService {
   AuthService._internal();
@@ -10,10 +12,18 @@ class AuthService {
     String email,
     String password,
   ) async {
-    return await _supabaseClient.auth.signInWithPassword(
+    debugPrint('🔑 AuthService - Tentando login: $email');
+
+    final response = await _supabaseClient.auth.signInWithPassword(
       email: email,
       password: password,
     );
+
+    debugPrint(
+      '🔑 AuthService - Resposta: user=${response.user != null}, session=${response.session != null}',
+    );
+
+    return response;
   }
 
   Future<AuthResponse> signUpWithEmailPassword(
@@ -28,19 +38,13 @@ class AuthService {
   }
 
   Future<void> updateEmail(String newEmail) async {
-    final session = _supabaseClient.auth.currentSession;
-    if (session != null) {
-      await _supabaseClient.auth.updateUser(UserAttributes(email: newEmail));
-    }
+    await _supabaseClient.auth.updateUser(UserAttributes(email: newEmail));
   }
 
   Future<void> updatePassword(String newPassword) async {
-    final session = _supabaseClient.auth.currentSession;
-    if (session != null) {
-      await _supabaseClient.auth.updateUser(
-        UserAttributes(password: newPassword),
-      );
-    }
+    await _supabaseClient.auth.updateUser(
+      UserAttributes(password: newPassword),
+    );
   }
 
   Future<void> resetPassword(String email) async {
@@ -48,10 +52,14 @@ class AuthService {
   }
 
   String? getCurrentUserEmail() {
-    final session = _supabaseClient.auth.currentSession;
-    final user = session?.user;
-    return user?.email;
+    return _supabaseClient.auth.currentUser?.email;
   }
+
+  String? getCurrentUserId() {
+    return _supabaseClient.auth.currentUser?.id;
+  }
+
+  bool get isLoggedIn => _supabaseClient.auth.currentSession != null;
 
   User? get currentUser => _supabaseClient.auth.currentUser;
 }

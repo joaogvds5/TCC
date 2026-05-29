@@ -8,22 +8,56 @@ class AuthGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder(
-      stream: Supabase.instance.client.auth.onAuthStateChange,
+    // Verifica sessão atual ANTES do StreamBuilder
+    final currentSession = Supabase.instance.client.auth.currentSession;
+    debugPrint(
+      '🔑 AuthGate BUILD - Sessão atual: ${currentSession != null ? "ATIVA" : "NULA"}',
+    );
+    debugPrint(
+      '🔑 AuthGate BUILD - User: ${currentSession?.user.email ?? "nenhum"}',
+    );
 
+    return StreamBuilder<AuthState>(
+      stream: Supabase.instance.client.auth.onAuthStateChange,
       builder: (context, snapshot) {
+        debugPrint(
+          '🔑 StreamBuilder - ConnectionState: ${snapshot.connectionState}',
+        );
+        debugPrint('🔑 StreamBuilder - HasData: ${snapshot.hasData}');
+        debugPrint('🔑 StreamBuilder - HasError: ${snapshot.hasError}');
+
+        if (snapshot.hasError) {
+          debugPrint('🔑 StreamBuilder - Erro: ${snapshot.error}');
+        }
+
+        // Loading inicial
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+            body: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text("Carregando..."),
+                ],
+              ),
+            ),
           );
         }
 
+        // Verifica sessão do snapshot E sessão atual (fallback)
         final session = snapshot.hasData ? snapshot.data!.session : null;
+        final hasSession = session != null || currentSession != null;
 
-        if (session != null) {
-          return MyHomePage();
+        debugPrint(
+          '🔑 AuthGate - Decisão: ${hasSession ? "MyHomePage" : "LoginPage"}',
+        );
+
+        if (hasSession) {
+          return const MyHomePage();
         } else {
-          return LoginPage();
+          return const LoginPage();
         }
       },
     );

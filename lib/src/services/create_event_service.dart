@@ -1,39 +1,27 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart ';
+import 'package:nearu/src/models/event.dart';
 
-class CreateEventService {
-  final SupabaseClient _supabaseClient = Supabase.instance.client;
+class EventService {
+  final SupabaseClient _client = Supabase.instance.client;
 
-  Future<bool> createEvent({
-    required String title,
-    required String description,
-    required String category,
-    required double latitude,
-    required double longitude,
-  }) async {
-    final session = _supabaseClient.auth.currentSession;
-    final user = _supabaseClient.auth.currentUser;
+  Future<void> createEvent(Event event) async {
+    final user = _client.auth.currentUser;
 
-    if (session == null || user == null) {
-      if (_supabaseClient.auth.currentUser == null) {
-        throw Exception("Usuário não autenticado");
-      }
-      return false;
+    if (user == null) {
+      throw Exception("Usuário não autenticado");
     }
 
-    try {
-      await _supabaseClient.from('events').insert({
-        'title': title,
-        'description': description,
-        'interest_category': category,
-        'latitude_event': latitude.toString(),
-        'longitude_event': longitude.toString(),
-        'user_creator': user.id,
-        'photo_event': '',
-      });
+    await _client.from('events').insert(event.toMap());
+  }
 
-      return true;
-    } catch (e) {
-      return false;
-    }
+  Future<List<Event>> getEvents() async {
+    final response = await _client.from('events').select();
+
+    return (response as List).map((e) => Event.fromMap(e)).toList();
+  }
+
+  // deletar evento na verdade será uma função de "cancelar" evento, ou seja, marcar como inativo no banco. eventualmente implementar
+  Future<void> deleteEvent(String eventId) async {
+    await _client.from('events').delete().eq('id', eventId);
   }
 }
