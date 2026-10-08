@@ -14,7 +14,7 @@ class PeopleController {
     try {
       final person = People(
         name: name,
-        biography: "Biografia padrão", // Placeholder, pode ser editado depois
+        biography: "Biografia padrão", //plceholder, pode ser editado depois
         birthDate: birthDate,
         photoUrl: null,
         interest: interest,
