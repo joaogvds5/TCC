@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+// lib/src/controllers/profile_controller.dart
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:nearu/src/models/profile.dart';
@@ -16,7 +16,6 @@ class ProfileController extends ChangeNotifier {
   String? get error => _error;
   bool get isLoggedIn => Supabase.instance.client.auth.currentUser != null;
 
-  /// Carrega o perfil do usuário logado
   Future<void> loadProfile() async {
     if (!isLoggedIn) {
       _error = 'Usuário não autenticado';
@@ -32,7 +31,7 @@ class ProfileController extends ChangeNotifier {
       _profile = await _service.getMyProfile();
 
       if (_profile == null) {
-        _error = 'Perfil não encontrado. Complete seu cadastro.';
+        _error = 'Perfil não encontrado';
       }
     } catch (e) {
       _error = 'Erro ao carregar perfil';
@@ -43,33 +42,40 @@ class ProfileController extends ChangeNotifier {
     }
   }
 
-  /// Atualiza o perfil
   Future<bool> updateProfile({
+    required String userUuid,
     String? name,
     String? biography,
     DateTime? birthDate,
     String? telephone,
   }) async {
-    if (_profile == null) return false;
-
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final updatedProfile = _profile!.copyWith(
+      await _service.updateProfileFields(
+        userUuid: userUuid,
         name: name,
         biography: biography,
         birthDate: birthDate,
         telephone: telephone,
       );
 
-      await _service.updateProfile(updatedProfile);
-      _profile = updatedProfile;
+      if (_profile != null) {
+        _profile = _profile!.copyWith(
+          name: name,
+          biography: biography,
+          birthDate: birthDate,
+          telephone: telephone,
+        );
+      }
+
+      debugPrint('Perfil atualizado com sucesso');
       return true;
     } catch (e) {
       _error = 'Erro ao atualizar perfil';
-      debugPrint('Erro ProfileController: $e');
+      debugPrint('Erro ao atualizar: $e');
       return false;
     } finally {
       _isLoading = false;
@@ -77,21 +83,30 @@ class ProfileController extends ChangeNotifier {
     }
   }
 
-  /// Atualiza foto de perfil
-  Future<bool> updateProfilePhoto(Uint8List imageBytes) async {
+  ///atualizar foto
+  Future<bool> updateProfilePhoto(
+    Uint8List imageBytes, {
+    required String userUuid,
+  }) async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      final photoUrl = await _service.uploadProfilePhotoBytes(imageBytes);
-      if (photoUrl != null && _profile != null) {
-        _profile = _profile!.copyWith(photoUrl: photoUrl);
+      final photoUrl = await _service.uploadProfilePhotoBytes(
+        imageBytes,
+        userUuid: userUuid,
+      );
+
+      if (photoUrl != null) {
+        if (_profile != null) {
+          _profile = _profile!.copyWith(photoUrl: photoUrl);
+        }
         return true;
       }
       return false;
     } catch (e) {
       _error = 'Erro ao atualizar foto';
-      debugPrint('Erro ProfileController: $e');
+      debugPrint('Erro ao atualizar foto: $e');
       return false;
     } finally {
       _isLoading = false;
@@ -99,10 +114,9 @@ class ProfileController extends ChangeNotifier {
     }
   }
 
-  /// Remove foto de perfil
-  Future<bool> removeProfilePhoto() async {
+  Future<bool> removeProfilePhoto(String userUuid) async {
     try {
-      await _service.removeProfilePhoto();
+      await _service.removeProfilePhoto(userUuid);
       if (_profile != null) {
         _profile = _profile!.copyWith(photoUrl: null);
         notifyListeners();
@@ -115,7 +129,6 @@ class ProfileController extends ChangeNotifier {
     }
   }
 
-  /// Logout
   Future<void> logout() async {
     await Supabase.instance.client.auth.signOut();
     _profile = null;
@@ -123,27 +136,6 @@ class ProfileController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Deleta conta
-  Future<bool> deleteAccount() async {
-    _isLoading = true;
-    notifyListeners();
-
-    try {
-      await _service.deleteAccount();
-      await Supabase.instance.client.auth.signOut();
-      _profile = null;
-      return true;
-    } catch (e) {
-      _error = 'Erro ao deletar conta';
-      debugPrint('Erro ProfileController: $e');
-      return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  /// Limpa mensagem de erro
   void clearError() {
     _error = null;
     notifyListeners();
