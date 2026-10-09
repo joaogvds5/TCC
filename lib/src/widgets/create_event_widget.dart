@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:nearu/src/controllers/event_controller.dart';
 import 'package:nearu/src/screens/login_screen.dart';
 import 'package:nearu/src/services/get_location.dart' as get_location;
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:nearu/src/controllers/event_controller.dart';
-// UnauthenticatedException já vem junto com esse import
 
 class AddEventWidget extends StatefulWidget {
   const AddEventWidget({super.key});
@@ -66,22 +63,19 @@ class _AddEventWidgetState extends State<AddEventWidget> {
 
       if (!mounted) return;
 
-      if (success) {
+      if (success != null) {
         _showMessage('Evento criado com sucesso!');
         Navigator.pop(context);
       } else {
         _showMessage('Erro ao criar evento');
       }
     } on UnauthenticatedException {
-      // Captura específica para não autenticado
       if (!mounted) return;
 
       _showMessage('Faça login para continuar');
 
-      // Fecha o modal primeiro
+      // primeiro fecha o model e entao abre a tela de login
       Navigator.pop(context);
-
-      // Depois abre a tela de login
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const LoginPage()),
