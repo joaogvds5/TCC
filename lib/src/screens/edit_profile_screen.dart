@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:nearu/src/controllers/profile_controller.dart';
 import 'package:nearu/src/models/profile.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final Profile profile;
@@ -39,7 +40,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
     _birthDate = widget.profile.birthDate;
 
-    // Listeners para detectar mudanças
     _nameController.addListener(_checkChanges);
     _bioController.addListener(_checkChanges);
     _phoneController.addListener(_checkChanges);
@@ -165,7 +165,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _saveProfile() async {
-    // Validações básicas
     if (_nameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -179,24 +178,34 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Upload da foto se houver
+      final userUuid = widget.profile.userUuid;
+
       if (_imageFile != null) {
         final bytes = await _imageFile!.readAsBytes();
         final uint8List = Uint8List.fromList(bytes);
-        final photoUpdated = await _controller.updateProfilePhoto(uint8List);
-        if (!photoUpdated) {
+
+        try {
+          final photoUpdated = await _controller.updateProfilePhoto(
+            uint8List,
+            userUuid: userUuid,
+          );
+
+          if (!photoUpdated) {
+            throw Exception('Erro ao fazer upload da foto');
+          }
+        } on StorageException catch (e) {
+          debugPrint('StorageException: ${e.message}');
+          throw Exception(
+            'Erro de permissão ao enviar foto. Verifique as políticas do bucket.',
+          );
+        } catch (e) {
+          debugPrint('Erro de upload: $e');
           throw Exception('Erro ao fazer upload da foto');
         }
-      } else if (_hasChanges &&
-          widget.profile.photoUrl != null &&
-          _imageFile == null) {
-        // Removeu a foto (tinha antes e agora não tem)
-        // Nota: só remove se explicitamente escolheu "Remover foto"
-        // Para isso, precisaria de um flag `_removePhoto`
       }
 
-      // Atualiza dados do perfil
       final success = await _controller.updateProfile(
+        userUuid: userUuid, // ← Passa o UUID
         name: _nameController.text.trim(),
         biography: _bioController.text.trim().isEmpty
             ? null
@@ -212,7 +221,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Perfil atualizado! 🎉'),
+            content: Text('Perfil atualizado!'),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
           ),
