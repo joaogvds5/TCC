@@ -12,7 +12,7 @@ class AuthService {
     String email,
     String password,
   ) async {
-    debugPrint('🔑 AuthService - Tentando login: $email');
+    debugPrint('AuthService - Tentando login: $email');
 
     final response = await _supabaseClient.auth.signInWithPassword(
       email: email,
@@ -20,7 +20,7 @@ class AuthService {
     );
 
     debugPrint(
-      '🔑 AuthService - Resposta: user=${response.user != null}, session=${response.session != null}',
+      'AuthService - Resposta: user=${response.user != null}, session=${response.session != null}',
     );
 
     return response;
@@ -30,7 +30,29 @@ class AuthService {
     String email,
     String password,
   ) async {
-    return await _supabaseClient.auth.signUp(email: email, password: password);
+    debugPrint('AuthService - Tentando cadastro: $email');
+
+    final response = await _supabaseClient.auth.signUp(
+      email: email,
+      password: password,
+    );
+
+    debugPrint(
+      'AuthService - Cadastro: user=${response.user != null}, '
+      'identities=${response.user?.identities?.length}',
+    );
+
+    if (response.user != null &&
+        (response.user!.identities == null ||
+            response.user!.identities!.isEmpty)) {
+      debugPrint('AuthService - E-mail já cadastrado: $email');
+      throw const AuthException(
+        'Este e-mail já está cadastrado. '
+        'Faça login ou recupere sua senha.',
+      );
+    }
+
+    return response;
   }
 
   Future<void> signOut() async {
