@@ -1,5 +1,4 @@
 import 'package:nearu/src/services/auth_service.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 
 class LoginResult {
@@ -17,13 +16,9 @@ class LoginService {
         password,
       );
 
-      if (response.user != null) {
-        // ✅ Força refresh da sessão para garantir que o Stream emita
-        await Supabase.instance.client.auth.refreshSession();
-
-        debugPrint(
-          '🔑 LoginService - Sessão após login: ${response.session != null ? "ATIVA" : "NULA"}',
-        );
+      if (response.user != null && response.session != null) {
+        debugPrint('LoginService - Sessão após login: ATIVA');
+        debugPrint('LoginService - User: ${response.user!.email}');
 
         return LoginResult(success: true, message: 'Login bem-sucedido!');
       } else {
@@ -33,11 +28,8 @@ class LoginService {
         );
       }
     } catch (e) {
-      debugPrint('🔑 LoginService - Erro: $e');
-      return LoginResult(
-        success: false,
-        message: 'Erro ao fazer login: ${e.toString()}',
-      );
+      debugPrint('LoginService - Erro: $e');
+      return LoginResult(success: false, message: 'Email ou senha inválidos.');
     }
   }
 }
