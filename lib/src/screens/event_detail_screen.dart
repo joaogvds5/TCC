@@ -253,8 +253,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               ],
             ),
           ),
-
-          // Conteúdo scrollável
           Expanded(
             child: ListView(
               controller: widget.scrollController,
@@ -297,8 +295,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       ),
 
                       const SizedBox(height: 8),
-
-                      // Data/Hora
                       Row(
                         children: [
                           Icon(
@@ -360,8 +356,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       ),
 
                       const SizedBox(height: 12),
-
-                      // Lista de participantes
                       if (_controller.participants.isNotEmpty)
                         _buildParticipantsList()
                       else
@@ -489,10 +483,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       ),
     );
   }
-
-  // ============================================
-  // WIDGETS AUXILIARES
-  // ============================================
 
   Widget _buildParticipantsList() {
     final participants = _showAllParticipants
