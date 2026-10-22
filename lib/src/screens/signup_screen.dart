@@ -14,7 +14,6 @@ class _SignUpPageState extends State<SignUpPage> {
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
   bool _isLoading = false;
-
   final TextEditingController nameController = TextEditingController();
   final TextEditingController birthController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
@@ -36,8 +35,6 @@ class _SignUpPageState extends State<SignUpPage> {
     confirmPasswordController.dispose();
     super.dispose();
   }
-
-  // ================= MÉTODOS AUXILIARES =================
 
   void _showError(String message) {
     if (!mounted) return;
@@ -78,10 +75,7 @@ class _SignUpPageState extends State<SignUpPage> {
     }
   }
 
-  // ================= AÇÃO DE CADASTRO =================
-
   Future<void> _handleSignUp() async {
-    // Validações
     if (nameController.text.trim().isEmpty) {
       _showError('Digite seu nome');
       return;
@@ -107,8 +101,6 @@ class _SignUpPageState extends State<SignUpPage> {
       _showError('Senhas não conferem');
       return;
     }
-
-    // Validação opcional de data
     DateTime? birthDate;
     if (birthController.text.isNotEmpty) {
       birthDate = _parseDate(birthController.text);
@@ -117,11 +109,8 @@ class _SignUpPageState extends State<SignUpPage> {
         return;
       }
     }
-
     setState(() => _isLoading = true);
-
     try {
-      // 1. Criar auth no Supabase
       final authResponse = await AuthService.instance.signUpWithEmailPassword(
         emailController.text.trim(),
         passwordController.text,
@@ -130,14 +119,9 @@ class _SignUpPageState extends State<SignUpPage> {
       if (authResponse.user == null) {
         if (!mounted) return;
         _showError('Erro ao criar conta. Tente novamente.');
-        setState(() => _isLoading = false);
         return;
       }
-
       final userId = authResponse.user!.id;
-
-      // 2. O TRIGGER `handle_new_user` já criou o perfil básico
-      //    Agora atualizamos com os dados extras do formulário
 
       final hasExtraData =
           nameController.text.trim().isNotEmpty ||
@@ -162,20 +146,21 @@ class _SignUpPageState extends State<SignUpPage> {
             .update(updateData)
             .eq('user_id', userId);
       }
-
       if (!mounted) return;
-
       _showSuccess(
         'Conta criada com sucesso! Verifique seu e-mail para confirmar.',
       );
-
-      // Pequeno delay para o usuário ver a mensagem
       Future.delayed(const Duration(milliseconds: 1500), () {
         if (mounted) Navigator.pop(context);
       });
     } on AuthException catch (e) {
       if (!mounted) return;
-      _showError('Erro ao criar conta: ${e.message}');
+      final isEmailInUse = _isEmailAlreadyRegistered(e);
+      _showError(
+        isEmailInUse
+            ? 'Este e-mail já está cadastrado. Faça login ou recupere sua senha.'
+            : 'Erro ao criar conta: ${e.message}',
+      );
     } catch (e) {
       if (!mounted) return;
       _showError('Erro inesperado: ${e.toString()}');
@@ -184,7 +169,13 @@ class _SignUpPageState extends State<SignUpPage> {
     }
   }
 
-  // ================= DATE PICKER =================
+  bool _isEmailAlreadyRegistered(AuthException e) {
+    final msg = e.message.toLowerCase();
+    return msg.contains('already registered') ||
+        msg.contains('already exists') ||
+        msg.contains('já está cadastrado') ||
+        msg.contains('user already registered');
+  }
 
   Future<void> _pickDate() async {
     final date = await showDatePicker(
@@ -202,8 +193,6 @@ class _SignUpPageState extends State<SignUpPage> {
     }
   }
 
-  // ================= BUILD =================
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -220,7 +209,7 @@ class _SignUpPageState extends State<SignUpPage> {
                   children: [
                     const SizedBox(height: 40),
                     const Text(
-                      "Criar conta ✨",
+                      "Criar conta",
                       style: TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
@@ -289,8 +278,6 @@ class _SignUpPageState extends State<SignUpPage> {
                     const SizedBox(height: 25),
                     _divider(),
                     const SizedBox(height: 20),
-                    _socialButtons(),
-                    const SizedBox(height: 30),
                     _loginText(),
                     const SizedBox(height: 20),
                   ],
@@ -303,8 +290,7 @@ class _SignUpPageState extends State<SignUpPage> {
     );
   }
 
-  // ================= UI COMPONENTS =================
-
+  // componentes de ui
   Widget _backgroundDecoration() {
     return Stack(
       children: [
@@ -443,57 +429,6 @@ class _SignUpPageState extends State<SignUpPage> {
         ),
         Expanded(child: Divider()),
       ],
-    );
-  }
-
-  Widget _socialButtons() {
-    return Row(
-      children: [
-        Expanded(
-          child: _socialButton(
-            "Google",
-            Icons.g_mobiledata,
-            Colors.red.shade700,
-            () => _showError('Login com Google em breve!'),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _socialButton(
-            "Facebook",
-            Icons.facebook,
-            const Color(0xFF1877F2),
-            () => _showError('Login com Facebook em breve!'),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _socialButton(
-    String text,
-    IconData icon,
-    Color color,
-    VoidCallback onTap,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade300),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(width: 8),
-            Text(text, style: const TextStyle(fontWeight: FontWeight.w500)),
-          ],
-        ),
-      ),
     );
   }
 
