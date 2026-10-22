@@ -65,53 +65,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _handleDeleteAccount() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Deletar conta'),
-        content: const Text(
-          'Esta ação é irreversível. Todos os seus dados serão perdidos.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Deletar'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true && mounted) {
-      final success = await _controller.deleteAccount();
-      if (mounted) {
-        if (success) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Conta deletada')));
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (_) => const LoginPage()),
-            (route) => false,
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Erro ao deletar conta'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    }
-  }
-
   void _navigateToEdit() async {
     if (_controller.profile == null) return;
 
@@ -153,7 +106,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       );
     }
-
     final profile = _controller.profile;
     if (profile == null) {
       return const Scaffold(body: Center(child: Text('Perfil não encontrado')));
@@ -215,8 +167,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
 
             const SizedBox(height: 20),
-
-            // Nome
             Text(
               profile.name,
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
@@ -231,8 +181,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
 
             const SizedBox(height: 32),
-
-            // Cards de informação
             _InfoCard(icon: Icons.person, title: 'Nome', value: profile.name),
 
             if (profile.biography != null && profile.biography!.isNotEmpty)
@@ -266,7 +214,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             const SizedBox(height: 32),
 
-            // Botões de ação
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
@@ -285,18 +232,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
 
             const SizedBox(height: 12),
-
-            SizedBox(
-              width: double.infinity,
-              child: TextButton.icon(
-                onPressed: _handleDeleteAccount,
-                icon: const Icon(Icons.delete_forever, size: 18),
-                label: const Text('Deletar conta'),
-                style: TextButton.styleFrom(
-                  foregroundColor: Colors.grey.shade500,
-                ),
-              ),
-            ),
 
             const SizedBox(height: 40),
           ],
