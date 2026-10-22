@@ -1,3 +1,4 @@
+// lib/src/services/login_service.dart
 import 'package:nearu/src/services/auth_service.dart';
 import 'package:flutter/material.dart';
 
@@ -9,9 +10,14 @@ class LoginResult {
 }
 
 class LoginService {
+  final AuthService _authService;
+
+  LoginService({AuthService? authService})
+    : _authService = authService ?? AuthService.instance;
+
   Future<LoginResult> login(String email, String password) async {
     try {
-      final response = await AuthService.instance.signInWithEmailPassword(
+      final response = await _authService.signInWithEmailPassword(
         email,
         password,
       );
