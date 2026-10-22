@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:nearu/src/controllers/home_controller.dart';
+import 'package:nearu/src/widgets/add_event_widget.dart';
+import 'package:nearu/src/models/event.dart';
+import 'package:nearu/src/screens/event_detail_screen.dart';
 import 'package:nearu/src/screens/profile_screen.dart';
 import 'package:nearu/src/screens/chats_screen.dart';
-import 'package:nearu/src/widgets/search_bar_widget.dart';
-import 'package:nearu/src/widgets/create_event_widget.dart';
 import 'package:nearu/src/widgets/map_view_widget.dart';
 import 'package:nearu/src/widgets/map_markers.dart';
 import 'package:nearu/src/widgets/profile_icon_widget.dart';
@@ -21,7 +22,7 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   final HomeController controller = HomeController();
   final MapController mapController = MapController();
-  final TextEditingController searchController = TextEditingController();
+  bool _isRefreshing = false;
 
   @override
   void initState() {
@@ -38,7 +39,6 @@ class _MyHomePageState extends State<MyHomePage> {
   void dispose() {
     controller.removeListener(_updateUI);
     controller.dispose();
-    searchController.dispose();
     super.dispose();
   }
 
@@ -62,8 +62,65 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  Future<void> _refreshEvents() async {
+    if (_isRefreshing) return;
+
+    setState(() => _isRefreshing = true);
+
+    try {
+      await Supabase.instance.client.rpc('cleanup_expired_events');
+      await controller.loadEvents();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Eventos atualizados!'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Erro ao atualizar eventos: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erro ao atualizar eventos'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _isRefreshing = false);
+    }
+  }
+
+  void _openEventDetail(Event event) {
+    debugPrint('Abrindo modal para: ${event.title}');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.85,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          builder: (context, scrollController) {
+            return EventDetailScreen(
+              event: event,
+              scrollController: scrollController,
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _openCreateEvent() async {
-    // Verifica se está logado antes de abrir o modal
     final isLoggedIn = Supabase.instance.client.auth.currentUser != null;
 
     if (!isLoggedIn) {
@@ -86,7 +143,7 @@ class _MyHomePageState extends State<MyHomePage> {
       return;
     }
 
-    final result = await showModalBottomSheet(
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
@@ -95,7 +152,6 @@ class _MyHomePageState extends State<MyHomePage> {
       builder: (_) => const AddEventWidget(),
     );
 
-    // Recarrega eventos independente do resultado
     controller.loadEvents();
   }
 
@@ -116,7 +172,10 @@ class _MyHomePageState extends State<MyHomePage> {
       );
     }
 
-    final markers = MapMarkersBuilder.build(controller.clusters);
+    final markers = MapMarkersBuilder.build(
+      controller.clusters,
+      onMarkerTap: _openEventDetail,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -125,15 +184,25 @@ class _MyHomePageState extends State<MyHomePage> {
         elevation: 0,
         backgroundColor: Theme.of(context).primaryColor,
         foregroundColor: Colors.white,
-
-        /// 👤 Perfil (esquerda)
         leading: Padding(
           padding: const EdgeInsets.only(left: 8),
           child: ProfileIconWidget(size: 36, onTap: _openProfile),
         ),
-
-        /// 💬 Chat (direita)
         actions: [
+          IconButton(
+            icon: _isRefreshing
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : const Icon(Icons.refresh),
+            onPressed: _isRefreshing ? null : _refreshEvents,
+            tooltip: 'Atualizar eventos',
+          ),
           IconButton(
             icon: const Icon(Icons.chat_bubble_outline),
             onPressed: _openChats,
@@ -142,28 +211,13 @@ class _MyHomePageState extends State<MyHomePage> {
           const SizedBox(width: 4),
         ],
       ),
-
       body: Stack(
         children: [
-          /// 🗺️ MAPA
           MapView(
             controller: mapController,
             center: controller.currentLatLng,
             markers: markers,
           ),
-
-          /// 🔍 SEARCH BAR
-          Positioned(
-            top: 16,
-            left: 16,
-            right: 16,
-            child: SearchBarWidget(
-              hintText: "Pesquisar eventos...",
-              controller: searchController,
-            ),
-          ),
-
-          /// 📍 Botão de localização (sobre o mapa)
           Positioned(
             bottom: 16,
             right: 16,
@@ -177,8 +231,6 @@ class _MyHomePageState extends State<MyHomePage> {
           ),
         ],
       ),
-
-      /// ➕ Botão de criar evento
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'add_event',
         onPressed: _openCreateEvent,
