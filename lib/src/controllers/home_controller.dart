@@ -74,7 +74,7 @@ class HomeController extends ChangeNotifier {
 
   LatLng get currentLatLng {
     if (latitude == null || longitude == null) {
-      return const LatLng(-22.21252037, -54.8264522); //unigran
+      return const LatLng(-22.21252037, -54.8264522); //fallback pra unigran
     }
     return LatLng(latitude!, longitude!);
   }
