@@ -1,8 +1,9 @@
 // lib/src/screens/login_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:nearu/src/screens/signup_screen.dart';
+import 'package:nearu/src/screens/home_screen.dart';
 import 'package:nearu/src/services/login_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -70,13 +71,29 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
 
       if (result.success) {
-        _showMessage('Login bem-sucedido! 🎉');
+        _showMessage('Login bem-sucedido!');
 
-        // ✅ NÃO DÊ Navigator.pop() AQUI!
-        // O AuthGate StreamBuilder vai detectar a sessão
-        // e trocar automaticamente para MyHomePage
+        debugPrint('✅ Login bem-sucedido');
 
-        debugPrint('✅ Login bem-sucedido, aguardando AuthGate...');
+        // FALLBACK: Verifica se a sessão existe e navega manualmente
+        final session = Supabase.instance.client.auth.currentSession;
+
+        if (session != null) {
+          debugPrint('🔑 Sessão ativa! Navegando para Home...');
+
+          // Pequeno delay para a UI atualizar
+          await Future.delayed(const Duration(milliseconds: 300));
+
+          if (mounted) {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (_) => const MyHomePage()),
+              (route) => false,
+            );
+          }
+        } else {
+          debugPrint('⚠️ Sessão ainda nula após login');
+        }
       } else {
         _showMessage(result.message, isError: true);
       }
@@ -97,7 +114,6 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _handleForgotPassword() {
-    // Implementar recuperação de senha
     _showMessage('Recuperação de senha em breve!');
   }
 
@@ -191,13 +207,6 @@ class _LoginPageState extends State<LoginPage> {
                 _divider(),
 
                 const SizedBox(height: 24),
-
-                // Botões sociais
-                _socialButtons(),
-
-                const SizedBox(height: 30),
-
-                // Link para cadastro
                 _signUpLink(),
 
                 const SizedBox(height: 20),
@@ -305,57 +314,6 @@ class _LoginPageState extends State<LoginPage> {
         ),
         Expanded(child: Divider(color: Colors.grey.shade300)),
       ],
-    );
-  }
-
-  Widget _socialButtons() {
-    return Row(
-      children: [
-        Expanded(
-          child: _socialButton(
-            "Google",
-            Icons.g_mobiledata,
-            Colors.red.shade700,
-            () {
-              _showMessage('Login com Google em breve!');
-            },
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _socialButton("GitHub", Icons.code, Colors.black, () {
-            _showMessage('Login com GitHub em breve!');
-          }),
-        ),
-      ],
-    );
-  }
-
-  Widget _socialButton(
-    String text,
-    IconData icon,
-    Color iconColor,
-    VoidCallback onTap,
-  ) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade300),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: iconColor, size: 22),
-            const SizedBox(width: 8),
-            Text(text, style: const TextStyle(fontWeight: FontWeight.w500)),
-          ],
-        ),
-      ),
     );
   }
 
