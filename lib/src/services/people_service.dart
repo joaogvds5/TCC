@@ -2,7 +2,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:nearu/src/models/people.dart';
 
 class PeopleService {
-  final SupabaseClient _client = Supabase.instance.client;
+  final SupabaseClient _client;
+
+  PeopleService({SupabaseClient? client})
+    : _client = client ?? Supabase.instance.client;
 
   Future<List<People>> getPeople() async {
     final response = await _client
