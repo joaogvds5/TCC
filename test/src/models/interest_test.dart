@@ -1,50 +1,84 @@
+// test/models/interest_test.dart
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nearu/src/models/interest.dart';
 
 void main() {
   group('Interest.fromMap', () {
-    test('Converte mapa completo', () {
-      final interest = Interest.fromMap({
+    test('usa "title"', () {
+      final i = Interest.fromMap({
         'id': 1,
         'title': 'Música',
         'icon': 'music_note',
       });
-
-      expect(interest.id, equals(1));
-      expect(interest.name, equals('Música'));
-      expect(interest.icon, equals('music_note'));
+      expect(i.id, 1);
+      expect(i.name, 'Música');
+      expect(i.icon, 'music_note');
     });
 
-    test('Usa interest_id como fallback de id', () {
-      final interest = Interest.fromMap({'interest_id': 5, 'name': 'Esporte'});
-
-      expect(interest.id, equals(5));
-      expect(interest.name, equals('Esporte'));
+    test('cai para "interest_id"/"name"', () {
+      final i = Interest.fromMap({'interest_id': 2, 'name': 'Tecnologia'});
+      expect(i.id, 2);
+      expect(i.name, 'Tecnologia');
     });
 
-    test('Usa valores padrão quando campos ausentes', () {
-      final interest = Interest.fromMap({});
-      expect(interest.id, equals(0));
-      expect(interest.name, equals(''));
-      expect(interest.icon, isNull);
+    test('mapa vazio retorna defaults', () {
+      final i = Interest.fromMap({});
+      expect(i.id, 0);
+      expect(i.name, '');
+      expect(i.icon, isNull);
+    });
+
+    test('parseia todos os ícones novos', () {
+      final cases = {
+        1: ('Música', 'music_note'),
+        2: ('Tecnologia', 'computer'),
+        3: ('Comida', 'restaurant'),
+        4: ('Natureza', 'park'),
+        5: ('Cultura', 'theater_comedy'),
+        6: ('Viagem', 'flight'),
+        7: ('Estudar', 'school'),
+        8: ('Outros', 'category'),
+      };
+      cases.forEach((id, pair) {
+        final i = Interest.fromMap({
+          'id': id,
+          'title': pair.$1,
+          'icon': pair.$2,
+        });
+        expect(i.id, id);
+        expect(i.name, pair.$1);
+        expect(i.icon, pair.$2);
+      });
     });
   });
 
-  group('Interest.toMap', () {
-    test('Converte Interest em mapa', () {
-      final interest = Interest(id: 2, name: 'Feira', icon: 'store');
-      final map = interest.toMap();
+  group('Interest equality', () {
+    test('mesmo id = iguais', () {
+      final a = Interest(id: 3, name: 'Comida');
+      final b = Interest(id: 3, name: 'Comida (renomeado)');
+      expect(a, equals(b));
+      expect(a.hashCode, b.hashCode);
+    });
 
-      expect(map['id'], equals(2));
-      expect(map['title'], equals('Feira'));
-      expect(map['icon'], equals('store'));
+    test('ids diferentes = não iguais', () {
+      expect(
+        Interest(id: 1, name: 'X'),
+        isNot(equals(Interest(id: 2, name: 'X'))),
+      );
     });
   });
 
-  group('Interest.toString', () {
-    test('Retorna representação legível', () {
-      final interest = Interest(id: 3, name: 'Tecnologia');
-      expect(interest.toString(), contains('Tecnologia'));
-    });
+  test('toMap', () {
+    final i = Interest(id: 3, name: 'Comida', icon: 'restaurant');
+    final map = i.toMap();
+    expect(map['id'], 3);
+    expect(map['title'], 'Comida');
+    expect(map['icon'], 'restaurant');
+  });
+
+  test('toString contém id e name', () {
+    final i = Interest(id: 5, name: 'Cultura');
+    expect(i.toString(), contains('5'));
+    expect(i.toString(), contains('Cultura'));
   });
 }

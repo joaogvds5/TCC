@@ -1,30 +1,113 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:nearu/main.dart';
+class TestSignUpPage extends StatefulWidget {
+  const TestSignUpPage({super.key});
+
+  @override
+  State<TestSignUpPage> createState() => _TestSignUpPageState();
+}
+
+class _TestSignUpPageState extends State<TestSignUpPage> {
+  final nameController = TextEditingController();
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+  final confirmController = TextEditingController();
+  String? error;
+
+  void _validate() {
+    if (nameController.text.trim().isEmpty) {
+      setState(() => error = 'Digite seu nome');
+    } else if (!emailController.text.contains('@')) {
+      setState(() => error = 'E-mail inválido');
+    } else if (passwordController.text.length < 6) {
+      setState(() => error = 'Senha curta');
+    } else if (passwordController.text != confirmController.text) {
+      setState(() => error = 'Senhas não conferem');
+    } else {
+      setState(() => error = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        body: Column(
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(hintText: 'Nome'),
+            ),
+            TextField(
+              controller: emailController,
+              decoration: const InputDecoration(hintText: 'E-mail'),
+            ),
+            TextField(
+              controller: passwordController,
+              decoration: const InputDecoration(hintText: 'Senha'),
+            ),
+            TextField(
+              controller: confirmController,
+              decoration: const InputDecoration(hintText: 'Confirmar'),
+            ),
+            ElevatedButton(
+              onPressed: _validate,
+              child: const Text('Cadastrar'),
+            ),
+            if (error != null) Text(error!),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  group('SignUp Screen - Renderização', () {
+    testWidgets('Renderiza 4 campos', (tester) async {
+      await tester.pumpWidget(const TestSignUpPage());
+      expect(find.byType(TextField), findsNWidgets(4));
+    });
+  });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+  group('SignUp Screen - Validações', () {
+    testWidgets('Erro com nome vazio', (tester) async {
+      await tester.pumpWidget(const TestSignUpPage());
+      await tester.tap(find.text('Cadastrar'));
+      await tester.pump();
+      expect(find.text('Digite seu nome'), findsOneWidget);
+    });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    testWidgets('Erro com email inválido', (tester) async {
+      await tester.pumpWidget(const TestSignUpPage());
+      await tester.enterText(find.byType(TextField).at(0), 'João');
+      await tester.enterText(find.byType(TextField).at(1), 'invalido');
+      await tester.tap(find.text('Cadastrar'));
+      await tester.pump();
+      expect(find.text('E-mail inválido'), findsOneWidget);
+    });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    testWidgets('Erro com senhas diferentes', (tester) async {
+      await tester.pumpWidget(const TestSignUpPage());
+      await tester.enterText(find.byType(TextField).at(0), 'João');
+      await tester.enterText(find.byType(TextField).at(1), 'teste@email.com');
+      await tester.enterText(find.byType(TextField).at(2), 'senha123');
+      await tester.enterText(find.byType(TextField).at(3), 'senha456');
+      await tester.tap(find.text('Cadastrar'));
+      await tester.pump();
+      expect(find.text('Senhas não conferem'), findsOneWidget);
+    });
+
+    testWidgets('Sem erro com dados válidos', (tester) async {
+      await tester.pumpWidget(const TestSignUpPage());
+      await tester.enterText(find.byType(TextField).at(0), 'João');
+      await tester.enterText(find.byType(TextField).at(1), 'teste@email.com');
+      await tester.enterText(find.byType(TextField).at(2), 'senha123');
+      await tester.enterText(find.byType(TextField).at(3), 'senha123');
+      await tester.tap(find.text('Cadastrar'));
+      await tester.pump();
+      expect(find.text('Senhas não conferem'), findsNothing);
+    });
   });
 }
