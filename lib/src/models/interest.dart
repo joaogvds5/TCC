@@ -1,4 +1,3 @@
-// lib/src/models/interest.dart
 class Interest {
   final int id;
   final String name;
@@ -17,6 +16,13 @@ class Interest {
   Map<String, dynamic> toMap() {
     return {'id': id, 'title': name, 'icon': icon};
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || (other is Interest && other.id == id);
+
+  @override
+  int get hashCode => id.hashCode;
 
   @override
   String toString() => 'Interest(id: $id, name: $name)';
