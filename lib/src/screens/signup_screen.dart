@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:nearu/src/screens/select_interests_screen.dart';
 import 'package:nearu/src/services/auth_service.dart';
 import 'package:intl/intl.dart';
 
@@ -24,6 +25,8 @@ class _SignUpPageState extends State<SignUpPage> {
 
   final Color primaryColor = const Color(0xFF0A0A23);
   final Color backgroundColor = const Color(0xFFEDEBFF);
+
+  static const int minAge = 18;
 
   @override
   void dispose() {
@@ -70,9 +73,19 @@ class _SignUpPageState extends State<SignUpPage> {
         if (date != null) return date;
       }
       return null;
-    } catch (e) {
+    } catch (_) {
       return null;
     }
+  }
+
+  int _ageFromBirthDate(DateTime birth) {
+    final now = DateTime.now();
+    int age = now.year - birth.year;
+    if (now.month < birth.month ||
+        (now.month == birth.month && now.day < birth.day)) {
+      age--;
+    }
+    return age;
   }
 
   Future<void> _handleSignUp() async {
@@ -101,14 +114,32 @@ class _SignUpPageState extends State<SignUpPage> {
       _showError('Senhas não conferem');
       return;
     }
-    DateTime? birthDate;
-    if (birthController.text.isNotEmpty) {
-      birthDate = _parseDate(birthController.text);
-      if (birthDate == null) {
-        _showError('Data inválida. Use DD/MM/AAAA');
-        return;
-      }
+
+    if (birthController.text.trim().isEmpty) {
+      _showError('Informe sua data de nascimento (obrigatório)');
+      return;
     }
+
+    final birthDate = _parseDate(birthController.text);
+    if (birthDate == null) {
+      _showError('Data inválida. Use DD/MM/AAAA');
+      return;
+    }
+
+    if (birthDate.isAfter(DateTime.now())) {
+      _showError('Data de nascimento não pode ser no futuro');
+      return;
+    }
+
+    final age = _ageFromBirthDate(birthDate);
+    if (age < minAge) {
+      _showError(
+        'É necessário ter pelo menos $minAge anos para se cadastrar. '
+        'Idade informada: $age ${age == 1 ? "ano" : "anos"}.',
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
       final authResponse = await AuthService.instance.signUpWithEmailPassword(
@@ -122,37 +153,44 @@ class _SignUpPageState extends State<SignUpPage> {
         return;
       }
       final userId = authResponse.user!.id;
+      final updateData = <String, dynamic>{
+        'name': nameController.text.trim(),
+        'birth_date': DateFormat('yyyy-MM-dd').format(birthDate),
+      };
+      if (phoneController.text.trim().isNotEmpty) {
+        updateData['telephone'] = phoneController.text.trim();
+      }
 
-      final hasExtraData =
-          nameController.text.trim().isNotEmpty ||
-          phoneController.text.trim().isNotEmpty ||
-          birthDate != null;
-
-      if (hasExtraData) {
-        final updateData = <String, dynamic>{
-          'name': nameController.text.trim(),
-        };
-
-        if (phoneController.text.trim().isNotEmpty) {
-          updateData['telephone'] = phoneController.text.trim();
-        }
-
-        if (birthDate != null) {
-          updateData['birth_date'] = birthDate.toIso8601String();
-        }
-
+      try {
         await Supabase.instance.client
             .from('users')
             .update(updateData)
             .eq('user_id', userId);
+      } catch (e) {
+        debugPrint('Erro ao salvar dados extras: $e');
+        if (!mounted) return;
+        _showError(
+          'Não foi possível salvar sua data de nascimento. '
+          'Verifique se você tem pelo menos $minAge anos.',
+        );
+        return;
       }
+
       if (!mounted) return;
-      _showSuccess(
-        'Conta criada com sucesso! Verifique seu e-mail para confirmar.',
+
+      _showSuccess('Conta criada com sucesso! Agora escolha seus interesses.');
+
+      await Future.delayed(const Duration(milliseconds: 800));
+      if (!mounted) return;
+
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => SelectInterestsScreen(userUuid: userId),
+        ),
       );
-      Future.delayed(const Duration(milliseconds: 1500), () {
-        if (mounted) Navigator.pop(context);
-      });
+
+      if (mounted) Navigator.pop(context);
     } on AuthException catch (e) {
       if (!mounted) return;
       final isEmailInUse = _isEmailAlreadyRegistered(e);
@@ -178,12 +216,15 @@ class _SignUpPageState extends State<SignUpPage> {
   }
 
   Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final lastAllowed = DateTime(now.year - minAge, now.month, now.day);
+
     final date = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().subtract(const Duration(days: 365 * 20)),
+      initialDate: DateTime(now.year - 20, now.month, now.day),
       firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
-      helpText: 'Selecione a data de nascimento',
+      lastDate: lastAllowed,
+      helpText: 'Você precisa ter pelo menos $minAge anos',
       cancelText: 'Cancelar',
       confirmText: 'Selecionar',
     );
@@ -229,14 +270,25 @@ class _SignUpPageState extends State<SignUpPage> {
                     ),
                     const SizedBox(height: 15),
 
-                    // Campo de data com DatePicker
+                    // Data de nascimento (obrigatória, 18+)
                     GestureDetector(
                       onTap: _pickDate,
                       child: AbsorbPointer(
                         child: _inputField(
                           controller: birthController,
-                          hint: "Data de nascimento (opcional)",
+                          hint: "Data de nascimento (obrigatório)",
                           icon: Icons.cake,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: Text(
+                        'É necessário ter pelo menos $minAge anos.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
                         ),
                       ),
                     ),
@@ -290,7 +342,6 @@ class _SignUpPageState extends State<SignUpPage> {
     );
   }
 
-  // componentes de ui
   Widget _backgroundDecoration() {
     return Stack(
       children: [
@@ -435,9 +486,7 @@ class _SignUpPageState extends State<SignUpPage> {
   Widget _loginText() {
     return Center(
       child: GestureDetector(
-        onTap: () {
-          Navigator.pop(context);
-        },
+        onTap: () => Navigator.pop(context),
         child: Text.rich(
           TextSpan(
             text: "Já possui uma conta? ",
