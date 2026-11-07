@@ -3,8 +3,9 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:nearu/src/models/event.dart';
 import 'package:nearu/src/services/load_events_service.dart';
-import 'package:nearu/src/widgets/map_marker_widget.dart';
 import 'package:nearu/src/widgets/map_marker_style.dart';
+import 'package:nearu/src/widgets/map_marker_widget.dart';
+import 'package:nearu/src/widgets/user_location_marker.dart';
 
 class MapMarkersBuilder {
   const MapMarkersBuilder();
@@ -40,5 +41,17 @@ class MapMarkersBuilder {
         ),
       );
     }).toList();
+  }
+
+  static Marker? buildUserMarker(LatLng? userLatLng) {
+    if (userLatLng == null) return null;
+
+    return Marker(
+      point: userLatLng,
+      width: MapMarkerStyle.userMarkerSize,
+      height: MapMarkerStyle.userMarkerSize,
+      alignment: Alignment.center,
+      child: const UserLocationMarker(),
+    );
   }
 }
