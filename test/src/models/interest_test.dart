@@ -1,4 +1,3 @@
-// test/models/interest_test.dart
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nearu/src/models/interest.dart';
 
