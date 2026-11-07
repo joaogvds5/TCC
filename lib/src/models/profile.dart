@@ -1,4 +1,3 @@
-// lib/src/models/profile.dart
 import 'package:nearu/src/models/interest.dart';
 
 class Profile {
@@ -26,9 +25,7 @@ class Profile {
     this.interests,
   });
 
-  /// 🔽 Banco → Objeto
   factory Profile.fromMap(Map<String, dynamic> map) {
-    // Converte interests de forma segura
     List<Interest>? interestsList;
 
     if (map['user_interest'] != null && map['user_interest'] is List) {
@@ -66,7 +63,6 @@ class Profile {
     );
   }
 
-  /// 🔼 Objeto → Banco
   Map<String, dynamic> toMap() {
     final map = <String, dynamic>{
       'name': name,
@@ -119,6 +115,13 @@ class Profile {
     }
     return age;
   }
+
+  bool get isAdult {
+    final a = age;
+    return a != null && a >= 18;
+  }
+
+  static const int minAge = 18;
 
   @override
   String toString() => 'Profile(name: $name, email: $email)';
