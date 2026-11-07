@@ -6,6 +6,7 @@ import 'package:nearu/src/models/event.dart';
 import 'package:nearu/src/screens/event_chat_screen.dart';
 import 'package:nearu/src/screens/login_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:nearu/src/screens/public_profile_screen.dart';
 
 class EventDetailScreen extends StatefulWidget {
   final Event event;
@@ -494,6 +495,15 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         ...participants.map(
           (participant) => ListTile(
             contentPadding: EdgeInsets.zero,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      PublicProfileScreen(userUuid: participant.userId),
+                ),
+              );
+            },
             leading: CircleAvatar(
               radius: 20,
               backgroundColor: Colors.grey.shade300,
@@ -515,6 +525,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               'Entrou em ${DateFormat('dd/MM/yyyy').format(participant.joinedAt)}',
               style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
             ),
+            trailing: const Icon(Icons.chevron_right, size: 18),
           ),
         ),
         if (_controller.participants.length > 5 && !_showAllParticipants)
