@@ -4,8 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:nearu/src/controllers/event_controller.dart';
+import 'package:nearu/src/models/interest.dart';
 import 'package:nearu/src/screens/login_screen.dart';
 import 'package:nearu/src/services/get_location.dart' as get_location;
+import 'package:nearu/src/services/interest_service.dart';
+import 'package:nearu/src/widgets/interest_selector_widget.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AddEventWidget extends StatefulWidget {
   const AddEventWidget({super.key});
@@ -14,40 +18,75 @@ class AddEventWidget extends StatefulWidget {
   State<AddEventWidget> createState() => _AddEventWidgetState();
 }
 
-class Category {
-  final int id;
-  final String name;
-  final IconData icon;
-
-  Category(this.id, this.name, this.icon);
-}
-
 class _AddEventWidgetState extends State<AddEventWidget> {
   final TextEditingController titleController = TextEditingController();
   final TextEditingController descriptionController = TextEditingController();
   final EventController controller = EventController();
   final ImagePicker _picker = ImagePicker();
+  final InterestService _interestService = InterestService();
 
   bool isLoading = false;
   File? _imageFile;
   Uint8List? _imageBytes;
   bool _hasImage = false;
 
-  final List<Category> categories = [
-    Category(1, 'Evento', Icons.event),
-    Category(2, 'Música', Icons.music_note),
-    Category(3, 'Esporte', Icons.sports_soccer),
-    Category(4, 'Feira', Icons.store),
-    Category(5, 'Tecnologia', Icons.computer),
-  ];
+  List<Interest> _categories = [];
+  Interest? _selectedCategory;
+  bool _isLoadingCategories = true;
+  String? _categoriesError;
 
-  late Category selectedCategory = categories.first;
+  @override
+  void initState() {
+    super.initState();
+    _loadCategories();
+  }
 
   @override
   void dispose() {
     titleController.dispose();
     descriptionController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadCategories() async {
+    setState(() {
+      _isLoadingCategories = true;
+      _categoriesError = null;
+    });
+
+    try {
+      final categories = await _interestService.getAllInterests();
+      if (!mounted) return;
+
+      Interest? preselected;
+      if (categories.isNotEmpty) {
+        final userId = Supabase.instance.client.auth.currentUser?.id;
+        if (userId != null) {
+          final userInterests = await _interestService.getUserInterestIds(
+            userId,
+          );
+          preselected = categories.cast<Interest?>().firstWhere(
+            (c) => userInterests.contains(c!.id),
+            orElse: () => null,
+          );
+        }
+        preselected ??= categories.first;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _categories = categories;
+        _selectedCategory = preselected;
+        _isLoadingCategories = false;
+      });
+    } catch (e) {
+      debugPrint('Erro ao carregar interesses: $e');
+      if (!mounted) return;
+      setState(() {
+        _categoriesError = 'Erro ao carregar categorias';
+        _isLoadingCategories = false;
+      });
+    }
   }
 
   Future<void> _pickImage() async {
@@ -110,7 +149,6 @@ class _AddEventWidgetState extends State<AddEventWidget> {
     if (source == null) return;
 
     try {
-      // 1. Pega a imagem
       final pickedFile = await _picker.pickImage(
         source: source,
         maxWidth: 1920,
@@ -120,7 +158,6 @@ class _AddEventWidgetState extends State<AddEventWidget> {
 
       if (pickedFile == null || !mounted) return;
 
-      // 2. Abre o cropper para recortar
       final croppedFile = await ImageCropper().cropImage(
         sourcePath: pickedFile.path,
         aspectRatio: const CropAspectRatio(ratioX: 16, ratioY: 9),
@@ -173,7 +210,6 @@ class _AddEventWidgetState extends State<AddEventWidget> {
     }
   }
 
-  /// recortar imagem
   Future<void> _reCropImage() async {
     if (_imageFile == null) return;
 
@@ -215,15 +251,18 @@ class _AddEventWidgetState extends State<AddEventWidget> {
     }
   }
 
-  // ============================================
-  // CRIAÇÃO DO EVENTO
-  // ============================================
-
   Future<void> _createEvent() async {
     if (titleController.text.trim().isEmpty) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Digite um título')));
+      return;
+    }
+
+    if (_selectedCategory == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Selecione uma categoria')));
       return;
     }
 
@@ -235,7 +274,7 @@ class _AddEventWidgetState extends State<AddEventWidget> {
       final eventId = await controller.createEvent(
         title: titleController.text.trim(),
         description: descriptionController.text.trim(),
-        categoryId: selectedCategory.id,
+        categoryId: _selectedCategory!.id,
         latitude: position.latitude,
         longitude: position.longitude,
         photoBytes: _imageBytes,
@@ -246,7 +285,7 @@ class _AddEventWidgetState extends State<AddEventWidget> {
       if (eventId != null) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Evento criado! 🎉')));
+        ).showSnackBar(const SnackBar(content: Text('Evento criado!')));
         Navigator.pop(context, true);
       } else {
         ScaffoldMessenger.of(
@@ -274,9 +313,68 @@ class _AddEventWidgetState extends State<AddEventWidget> {
     }
   }
 
-  // ============================================
-  // BUILD
-  // ============================================
+  Widget _buildCategorySection() {
+    if (_isLoadingCategories) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_categoriesError != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                _categoriesError!,
+                style: const TextStyle(color: Colors.red),
+              ),
+            ),
+            TextButton(
+              onPressed: _loadCategories,
+              child: const Text('Tentar novamente'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_categories.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Text(
+          'Nenhum interesse disponível no momento.',
+          style: TextStyle(color: Colors.grey.shade600),
+        ),
+      );
+    }
+
+    return DropdownButtonFormField<Interest>(
+      value: _selectedCategory,
+      isExpanded: true,
+      items: _categories.map((cat) {
+        return DropdownMenuItem<Interest>(
+          value: cat,
+          child: Row(
+            children: [
+              Icon(InterestSelectorWidget.iconFor(cat.icon), size: 18),
+              const SizedBox(width: 8),
+              Flexible(child: Text(cat.name)),
+            ],
+          ),
+        );
+      }).toList(),
+      onChanged: (value) {
+        setState(() => _selectedCategory = value);
+      },
+      decoration: const InputDecoration(
+        labelText: 'Categoria',
+        border: OutlineInputBorder(),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -301,9 +399,6 @@ class _AddEventWidgetState extends State<AddEventWidget> {
 
             const SizedBox(height: 20),
 
-            // ============================================
-            // 📸 FOTO DO EVENTO (COM RECORTE)
-            // ============================================
             const Text(
               'Foto do Evento (opcional)',
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
@@ -327,7 +422,6 @@ class _AddEventWidgetState extends State<AddEventWidget> {
                 child: _hasImage
                     ? Stack(
                         children: [
-                          // Imagem
                           ClipRRect(
                             borderRadius: BorderRadius.circular(11),
                             child: Image.file(
@@ -337,13 +431,11 @@ class _AddEventWidgetState extends State<AddEventWidget> {
                               fit: BoxFit.cover,
                             ),
                           ),
-                          // Botões sobre a imagem
                           Positioned(
                             top: 8,
                             right: 8,
                             child: Row(
                               children: [
-                                // Botão recortar
                                 GestureDetector(
                                   onTap: _reCropImage,
                                   child: Container(
@@ -362,7 +454,6 @@ class _AddEventWidgetState extends State<AddEventWidget> {
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                // Botão remover
                                 GestureDetector(
                                   onTap: () {
                                     setState(() {
@@ -387,7 +478,6 @@ class _AddEventWidgetState extends State<AddEventWidget> {
                               ],
                             ),
                           ),
-                          // Label "Toque para trocar"
                           Positioned(
                             bottom: 8,
                             left: 8,
@@ -442,9 +532,6 @@ class _AddEventWidgetState extends State<AddEventWidget> {
 
             const SizedBox(height: 16),
 
-            // ============================================
-            // TÍTULO
-            // ============================================
             TextField(
               controller: titleController,
               decoration: const InputDecoration(
@@ -455,9 +542,6 @@ class _AddEventWidgetState extends State<AddEventWidget> {
 
             const SizedBox(height: 15),
 
-            // ============================================
-            // DESCRIÇÃO
-            // ============================================
             TextField(
               controller: descriptionController,
               maxLines: 3,
@@ -469,43 +553,16 @@ class _AddEventWidgetState extends State<AddEventWidget> {
 
             const SizedBox(height: 15),
 
-            // ============================================
-            // CATEGORIA
-            // ============================================
-            DropdownButtonFormField<Category>(
-              value: selectedCategory,
-              items: categories.map((cat) {
-                return DropdownMenuItem(
-                  value: cat,
-                  child: Row(
-                    children: [
-                      Icon(cat.icon, size: 18),
-                      const SizedBox(width: 8),
-                      Text(cat.name),
-                    ],
-                  ),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  selectedCategory = value!;
-                });
-              },
-              decoration: const InputDecoration(
-                labelText: 'Categoria',
-                border: OutlineInputBorder(),
-              ),
-            ),
+            _buildCategorySection(),
 
             const SizedBox(height: 20),
 
-            // ============================================
-            // BOTÃO CRIAR
-            // ============================================
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: isLoading ? null : _createEvent,
+                onPressed: (isLoading || _selectedCategory == null)
+                    ? null
+                    : _createEvent,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0A0A23),
                   foregroundColor: Colors.white,
