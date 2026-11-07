@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:nearu/src/controllers/home_controller.dart';
-import 'package:nearu/src/widgets/add_event_widget.dart';
 import 'package:nearu/src/models/event.dart';
-import 'package:nearu/src/screens/event_detail_screen.dart';
-import 'package:nearu/src/screens/profile_screen.dart';
 import 'package:nearu/src/screens/chats_screen.dart';
-import 'package:nearu/src/widgets/map_view_widget.dart';
-import 'package:nearu/src/widgets/map_markers.dart';
-import 'package:nearu/src/widgets/profile_icon_widget.dart';
+import 'package:nearu/src/screens/event_detail_screen.dart';
 import 'package:nearu/src/screens/login_screen.dart';
+import 'package:nearu/src/screens/profile_screen.dart';
+import 'package:nearu/src/widgets/add_event_widget.dart';
+import 'package:nearu/src/widgets/map_markers.dart';
+import 'package:nearu/src/widgets/map_view_widget.dart';
+import 'package:nearu/src/widgets/profile_icon_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class MyHomePage extends StatefulWidget {
@@ -93,7 +93,7 @@ class _MyHomePageState extends State<MyHomePage> {
         );
       }
     } finally {
-      setState(() => _isRefreshing = false);
+      if (mounted) setState(() => _isRefreshing = false);
     }
   }
 
@@ -172,10 +172,19 @@ class _MyHomePageState extends State<MyHomePage> {
       );
     }
 
-    final markers = MapMarkersBuilder.build(
+    final eventMarkers = MapMarkersBuilder.build(
       controller.clusters,
       onMarkerTap: _openEventDetail,
     );
+
+    final userMarker = controller.hasLocation
+        ? MapMarkersBuilder.buildUserMarker(controller.currentLatLng)
+        : null;
+
+    final allMarkers = <Marker>[
+      ...eventMarkers,
+      if (userMarker != null) userMarker,
+    ];
 
     return Scaffold(
       appBar: AppBar(
@@ -216,7 +225,7 @@ class _MyHomePageState extends State<MyHomePage> {
           MapView(
             controller: mapController,
             center: controller.currentLatLng,
-            markers: markers,
+            markers: allMarkers,
           ),
           Positioned(
             bottom: 16,
