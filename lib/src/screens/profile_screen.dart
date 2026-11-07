@@ -1,8 +1,11 @@
+// lib/src/screens/profile_screen.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:nearu/src/controllers/profile_controller.dart';
 import 'package:nearu/src/screens/edit_profile_screen.dart';
 import 'package:nearu/src/screens/login_screen.dart';
+import 'package:nearu/src/screens/select_interests_screen.dart';
+import 'package:nearu/src/widgets/interest_selector_widget.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -80,6 +83,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _navigateToInterests() async {
+    if (_controller.profile == null) return;
+
+    final updated = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            SelectInterestsScreen(userUuid: _controller.profile!.userUuid),
+      ),
+    );
+
+    if (updated == true && mounted) {
+      _controller.loadProfile();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_controller.isLoading) {
@@ -106,6 +125,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       );
     }
+
     final profile = _controller.profile;
     if (profile == null) {
       return const Scaffold(body: Center(child: Text('Perfil não encontrado')));
@@ -122,7 +142,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            // Avatar
             Center(
               child: Stack(
                 children: [
@@ -212,6 +231,76 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 value: DateFormat('dd/MM/yyyy').format(profile.createdAt!),
               ),
 
+            // ===== Interesses =====
+            Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Theme.of(
+                              context,
+                            ).primaryColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            Icons.interests,
+                            color: Theme.of(context).primaryColor,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        const Expanded(
+                          child: Text(
+                            'Interesses',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _navigateToInterests,
+                          child: const Text('Editar'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    if (profile.interests == null || profile.interests!.isEmpty)
+                      Text(
+                        'Nenhum interesse selecionado. Toque em "Editar" para escolher.',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 13,
+                        ),
+                      )
+                    else
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: profile.interests!.map((i) {
+                          return Chip(
+                            avatar: Icon(
+                              InterestSelectorWidget.iconFor(i.icon),
+                              size: 18,
+                            ),
+                            label: Text(i.name),
+                          );
+                        }).toList(),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+
             const SizedBox(height: 32),
 
             SizedBox(
@@ -231,8 +320,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
 
-            const SizedBox(height: 12),
-
             const SizedBox(height: 40),
           ],
         ),
@@ -241,7 +328,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
-// Widget auxiliar para cards de informação
 class _InfoCard extends StatelessWidget {
   final IconData icon;
   final String title;
