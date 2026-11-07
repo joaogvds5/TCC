@@ -48,6 +48,7 @@ class _AddEventWidgetState extends State<AddEventWidget> {
     super.dispose();
   }
 
+  //
   Future<void> _loadCategories() async {
     setState(() {
       _isLoadingCategories = true;
