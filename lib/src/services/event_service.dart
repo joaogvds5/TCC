@@ -1,4 +1,3 @@
-// lib/src/services/event_service.dart
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
