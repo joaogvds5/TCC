@@ -47,6 +47,14 @@ class EventService {
     }
   }
 
+  Future<List<Map<String, dynamic>>> getActiveEventsWithInterest() async {
+    final response = await _client
+        .from('active_events')
+        .select('*, interest(id, title, icon)')
+        .order('created_at', ascending: false);
+    return (response as List).map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+
   Future<bool> deleteEvent(String eventId) async {
     try {
       final userId = _client.auth.currentUser?.id;
