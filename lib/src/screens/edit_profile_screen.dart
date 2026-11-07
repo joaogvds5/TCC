@@ -3,8 +3,10 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:nearu/src/controllers/interest_controller.dart';
 import 'package:nearu/src/controllers/profile_controller.dart';
 import 'package:nearu/src/models/profile.dart';
+import 'package:nearu/src/widgets/interest_selector_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -27,6 +29,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   final ProfileController _controller = ProfileController();
   final ImagePicker _picker = ImagePicker();
+  late final InterestController _interestController;
+
+  Set<int> _initialInterestIds = {};
+  bool _interestsLoaded = false;
 
   @override
   void initState() {
@@ -40,10 +46,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
     _birthDate = widget.profile.birthDate;
 
+    _interestController = InterestController();
+    _interestController.addListener(_checkChanges);
+    _interestController.load(userUuid: widget.profile.userUuid).then((_) {
+      _initialInterestIds = Set<int>.from(_interestController.selectedIds);
+      _interestsLoaded = true;
+      _checkChanges();
+    });
+
     _nameController.addListener(_checkChanges);
     _bioController.addListener(_checkChanges);
     _phoneController.addListener(_checkChanges);
   }
+
+  bool _setEquals(Set<int> a, Set<int> b) =>
+      a.length == b.length && a.containsAll(b);
 
   void _checkChanges() {
     final hasChanges =
@@ -51,7 +68,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         _bioController.text != (widget.profile.biography ?? '') ||
         _phoneController.text != (widget.profile.telephone ?? '') ||
         _birthDate != widget.profile.birthDate ||
-        _imageFile != null;
+        _imageFile != null ||
+        (_interestsLoaded &&
+            !_setEquals(_initialInterestIds, _interestController.selectedIds));
 
     if (_hasChanges != hasChanges) {
       setState(() => _hasChanges = hasChanges);
@@ -63,6 +82,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nameController.removeListener(_checkChanges);
     _bioController.removeListener(_checkChanges);
     _phoneController.removeListener(_checkChanges);
+    _interestController.removeListener(_checkChanges);
+    _interestController.dispose();
     _nameController.dispose();
     _bioController.dispose();
     _phoneController.dispose();
@@ -146,14 +167,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  static const int minAge = 18;
+
   Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final lastAllowed = DateTime(now.year - minAge, now.month, now.day);
+
     final date = await showDatePicker(
       context: context,
-      initialDate:
-          _birthDate ?? DateTime.now().subtract(const Duration(days: 365 * 20)),
+      initialDate: _birthDate ?? DateTime(now.year - 20, now.month, now.day),
       firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
-      helpText: 'Selecione a data de nascimento',
+      lastDate: lastAllowed, // 👈 não deixa escolher < 18 anos
+      helpText: 'Você precisa ter pelo menos $minAge anos',
     );
 
     if (date != null && mounted) {
@@ -164,11 +189,56 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  int _ageFromBirthDate(DateTime birth) {
+    final now = DateTime.now();
+    int age = now.year - birth.year;
+    if (now.month < birth.month ||
+        (now.month == birth.month && now.day < birth.day)) {
+      age--;
+    }
+    return age;
+  }
+
   Future<void> _saveProfile() async {
     if (_nameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Nome é obrigatório'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // ---------- Validação de idade mínima ----------
+    if (_birthDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Data de nascimento é obrigatória'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (_birthDate!.isAfter(DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Data de nascimento não pode ser no futuro'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final age = _ageFromBirthDate(_birthDate!);
+    if (age < minAge) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'É necessário ter pelo menos $minAge anos. '
+            'Idade informada: $age ${age == 1 ? "ano" : "anos"}.',
+          ),
           backgroundColor: Colors.red,
         ),
       );
@@ -189,7 +259,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             uint8List,
             userUuid: userUuid,
           );
-
           if (!photoUpdated) {
             throw Exception('Erro ao fazer upload da foto');
           }
@@ -204,8 +273,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         }
       }
 
+      if (_interestsLoaded &&
+          !_setEquals(_initialInterestIds, _interestController.selectedIds)) {
+        final okInterests = await _interestController.save(userUuid: userUuid);
+        if (!okInterests) {
+          throw Exception('Erro ao salvar interesses');
+        }
+        _initialInterestIds = Set<int>.from(_interestController.selectedIds);
+      }
       final success = await _controller.updateProfile(
-        userUuid: userUuid, // ← Passa o UUID
+        userUuid: userUuid,
         name: _nameController.text.trim(),
         biography: _bioController.text.trim().isEmpty
             ? null
@@ -271,7 +348,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            // Foto
             Center(
               child: GestureDetector(
                 onTap: _pickImage,
@@ -324,7 +400,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
             const SizedBox(height: 32),
 
-            // Campos
             TextField(
               controller: _nameController,
               textCapitalization: TextCapitalization.words,
@@ -357,7 +432,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
             const SizedBox(height: 16),
 
-            // Data de nascimento
             GestureDetector(
               onTap: _pickDate,
               child: AbsorbPointer(
@@ -379,6 +453,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.only(left: 4),
+              child: Text(
+                'É necessário ter pelo menos $minAge anos.',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
+            ),
 
             const SizedBox(height: 16),
 
@@ -395,9 +477,44 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
             ),
 
+            const SizedBox(height: 24),
+
+            // ===== Interesses =====
+            Row(
+              children: [
+                Icon(
+                  Icons.interests,
+                  size: 20,
+                  color: Theme.of(context).primaryColor,
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'Interesses',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Escolha os temas que te interessam.',
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (!_interestsLoaded)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else
+              InterestSelectorWidget(controller: _interestController),
+
             const SizedBox(height: 32),
 
-            // Email (não editável)
             if (widget.profile.email != null)
               Container(
                 width: double.infinity,
