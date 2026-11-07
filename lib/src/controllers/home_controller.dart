@@ -1,5 +1,6 @@
-// lib/src/controllers/home_controller.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:nearu/src/services/get_location.dart' as getLocation;
@@ -14,6 +15,8 @@ class HomeController extends ChangeNotifier {
 
   List<EventCluster> clusters = [];
 
+  StreamSubscription<Position>? _positionSub;
+
   Future<void> init() async {
     isLoading = true;
     errorMessage = null;
@@ -26,6 +29,8 @@ class HomeController extends ChangeNotifier {
 
       await _cleanupExpiredEvents();
       await loadEvents();
+
+      _startPositionStream();
     } catch (e) {
       debugPrint("Erro HomeController: $e");
       errorMessage = "Erro ao carregar dados. Verifique sua conexão.";
@@ -33,6 +38,21 @@ class HomeController extends ChangeNotifier {
       isLoading = false;
       notifyListeners();
     }
+  }
+
+  void _startPositionStream() {
+    _positionSub?.cancel();
+    _positionSub =
+        Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 10, // atualiza a cada 10 m
+          ),
+        ).listen((pos) {
+          latitude = pos.latitude;
+          longitude = pos.longitude;
+          notifyListeners();
+        }, onError: (e) => debugPrint('HomeController stream erro: $e'));
   }
 
   Future<void> loadEvents() async {
@@ -74,10 +94,16 @@ class HomeController extends ChangeNotifier {
 
   LatLng get currentLatLng {
     if (latitude == null || longitude == null) {
-      return const LatLng(-22.21252037, -54.8264522); //fallback pra unigran
+      return const LatLng(-22.21252037, -54.8264522); // fallback Unigran
     }
     return LatLng(latitude!, longitude!);
   }
 
   bool get hasLocation => latitude != null && longitude != null;
+
+  @override
+  void dispose() {
+    _positionSub?.cancel();
+    super.dispose();
+  }
 }
