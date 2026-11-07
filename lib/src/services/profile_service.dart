@@ -2,10 +2,15 @@ import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:nearu/src/models/profile.dart';
-import 'package:nearu/src/models/interest.dart';
+import 'package:nearu/src/services/interest_service.dart';
 
 class ProfileService {
-  final SupabaseClient _client = Supabase.instance.client;
+  final SupabaseClient _client;
+  final InterestService _interestService;
+
+  ProfileService({SupabaseClient? client, InterestService? interestService})
+    : _client = client ?? Supabase.instance.client,
+      _interestService = interestService ?? InterestService();
 
   Future<Profile?> getMyProfile() async {
     try {
@@ -15,9 +20,8 @@ class ProfileService {
         return null;
       }
 
-      debugPrint('🔍 Buscando perfil para user_id: $userId');
+      debugPrint('Buscando perfil para user_id: $userId');
 
-      // Busca o perfil básico
       var userResponse = await _client
           .from('users')
           .select('*')
@@ -26,7 +30,6 @@ class ProfileService {
 
       if (userResponse == null) {
         debugPrint('Perfil não encontrado. Tentando criar...');
-
         final created = await _tryCreateProfile(userId);
         if (created != null) {
           userResponse = created;
@@ -37,31 +40,10 @@ class ProfileService {
 
       debugPrint('Perfil carregado: ${userResponse['name']}');
 
-      // Busca interesses separadamente
-      List<Interest>? interests;
-      try {
-        final interestsResponse = await _client
-            .from('user_interest')
-            .select('interest_id, interest(*)')
-            .eq('user_id', userId);
+      final interests = await _interestService.getUserInterests(userId);
 
-        interests = interestsResponse
-            .map((item) {
-              final interestData = item['interest'];
-              if (interestData is Map<String, dynamic>) {
-                return Interest.fromMap(interestData);
-              }
-              return null;
-            })
-            .whereType<Interest>()
-            .toList();
-      } catch (e) {
-        debugPrint('Erro ao buscar interesses: $e');
-      }
-
-      // Monta o perfil completo
       final profileData = Map<String, dynamic>.from(userResponse);
-      if (interests != null && interests.isNotEmpty) {
+      if (interests.isNotEmpty) {
         profileData['user_interest'] = interests
             .map((i) => {'interest': i.toMap()})
             .toList();
@@ -84,30 +66,10 @@ class ProfileService {
 
       if (response == null) return null;
 
-      // Busca interesses
-      List<Interest>? interests;
-      try {
-        final interestsResponse = await _client
-            .from('user_interest')
-            .select('interest_id, interest(*)')
-            .eq('user_id', uuid);
-
-        interests = interestsResponse
-            .map((item) {
-              final interestData = item['interest'];
-              if (interestData is Map<String, dynamic>) {
-                return Interest.fromMap(interestData);
-              }
-              return null;
-            })
-            .whereType<Interest>()
-            .toList();
-      } catch (e) {
-        debugPrint('Erro ao buscar interesses: $e');
-      }
+      final interests = await _interestService.getUserInterests(uuid);
 
       final profileData = Map<String, dynamic>.from(response);
-      if (interests != null && interests.isNotEmpty) {
+      if (interests.isNotEmpty) {
         profileData['user_interest'] = interests
             .map((i) => {'interest': i.toMap()})
             .toList();
@@ -120,7 +82,6 @@ class ProfileService {
     }
   }
 
-  /// Tenta criar o perfil se ele não existir
   Future<Map<String, dynamic>?> _tryCreateProfile(String userId) async {
     try {
       final user = _client.auth.currentUser;
@@ -158,28 +119,36 @@ class ProfileService {
     String? telephone,
     String? photoUrl,
   }) async {
+    final data = <String, dynamic>{};
+
+    if (name != null) data['name'] = name;
+    if (biography != null) data['biography'] = biography;
+    if (birthDate != null) {
+      data['birth_date'] = DateFormat('yyyy-MM-dd').format(birthDate);
+    }
+    if (telephone != null) data['telephone'] = telephone;
+    if (photoUrl != null) data['photo_user'] = photoUrl;
+
+    if (data.isEmpty) {
+      debugPrint('Nenhum campo para atualizar');
+      return;
+    }
+
+    debugPrint('Atualizando perfil de: $userUuid');
+    debugPrint('Campos: $data');
+
     try {
-      final data = <String, dynamic>{};
+      await _client.from('users').update(data).eq('user_id', userUuid);
+      debugPrint('Perfil atualizado com sucesso');
+    } on PostgrestException catch (e) {
+      final msg = e.message.toLowerCase();
 
-      if (name != null) data['name'] = name;
-      if (biography != null) data['biography'] = biography;
-      if (birthDate != null)
-        // ignore: curly_braces_in_flow_control_structures
-        data['birth_date'] = DateFormat('yyyy-MM-dd').format(birthDate);
-      if (telephone != null) data['telephone'] = telephone;
-      if (photoUrl != null) data['photo_user'] = photoUrl;
-
-      if (data.isEmpty) {
-        debugPrint('Nenhum campo para atualizar');
-        return;
+      if (msg.contains('chk_users_min_age_18')) {
+        throw Exception('É necessário ter pelo menos 18 anos.');
       }
 
-      debugPrint('Atualizando perfil de: $userUuid');
-      debugPrint('Campos: $data');
-
-      await _client.from('users').update(data).eq('user_id', userUuid);
-
-      debugPrint('Perfil atualizado com sucesso');
+      debugPrint('PostgrestException: ${e.message}');
+      rethrow;
     } catch (e) {
       debugPrint('Erro ao atualizar perfil: $e');
       rethrow;
@@ -203,15 +172,11 @@ class ProfileService {
     try {
       final currentUser = _client.auth.currentUser;
       if (currentUser == null) {
-        debugPrint('Usuário não autenticado');
         throw Exception('Usuário não autenticado');
       }
 
       final fileName =
           'profile_${userUuid}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-
-      debugPrint('Fazendo upload: $fileName');
-      debugPrint('Tamanho: ${bytes.length} bytes');
 
       await _client.storage
           .from('avatars')
@@ -224,21 +189,16 @@ class ProfileService {
             ),
           );
 
-      debugPrint('Upload concluído');
-
       final photoUrl = _client.storage.from('avatars').getPublicUrl(fileName);
-      debugPrint('URL pública: $photoUrl');
 
       await _client
           .from('users')
           .update({'photo_user': photoUrl})
           .eq('user_id', userUuid);
 
-      debugPrint('Perfil atualizado com nova foto');
       return photoUrl;
     } on StorageException catch (e) {
       debugPrint('StorageException: ${e.message}');
-      debugPrint('Status: ${e.statusCode}');
       throw Exception('Erro de storage: ${e.message}');
     } catch (e) {
       debugPrint('Erro ao fazer upload da foto: $e');
@@ -284,14 +244,12 @@ class ProfileService {
     }
   }
 
-  /// Remove foto de perfil
   Future<void> removeProfilePhoto(String userUuid) async {
     try {
       await _client
           .from('users')
           .update({'photo_user': null})
           .eq('user_id', userUuid);
-      debugPrint('Foto removida');
     } catch (e) {
       debugPrint('Erro ao remover foto: $e');
       rethrow;
@@ -299,41 +257,18 @@ class ProfileService {
   }
 
   Future<List<int>> getUserInterestIds() async {
-    try {
-      final userId = _client.auth.currentUser?.id;
-      if (userId == null) return [];
-
-      final response = await _client
-          .from('user_interest')
-          .select('interest_id')
-          .eq('user_id', userId);
-
-      return (response as List).map((e) => e['interest_id'] as int).toList();
-    } catch (e) {
-      debugPrint('Erro ao buscar interesses: $e');
-      return [];
-    }
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return [];
+    final ids = await _interestService.getUserInterestIds(userId);
+    return ids.toList();
   }
 
   Future<void> updateInterests(List<int> interestIds) async {
-    try {
-      final userId = _client.auth.currentUser?.id;
-      if (userId == null) throw Exception('Usuário não autenticado');
-
-      await _client.from('user_interest').delete().eq('user_id', userId);
-
-      if (interestIds.isNotEmpty) {
-        final inserts = interestIds
-            .map((id) => {'user_id': userId, 'interest_id': id})
-            .toList();
-
-        await _client.from('user_interest').insert(inserts);
-      }
-
-      debugPrint('Interesses atualizados');
-    } catch (e) {
-      debugPrint('Erro ao atualizar interesses: $e');
-      rethrow;
-    }
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) throw Exception('Usuário não autenticado');
+    await _interestService.setUserInterests(
+      userUuid: userId,
+      interestIds: interestIds.toSet(),
+    );
   }
 }
