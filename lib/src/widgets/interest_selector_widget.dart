@@ -31,10 +31,10 @@ class InterestSelectorWidget extends StatelessWidget {
         return Icons.school;
       case 'category':
         return Icons.category;
-      case 'event':
-        return Icons.event;
       case 'sports_soccer':
         return Icons.sports_soccer;
+      case 'event':
+        return Icons.event;
       case 'store':
         return Icons.store;
       default:

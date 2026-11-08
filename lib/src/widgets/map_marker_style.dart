@@ -1,24 +1,19 @@
-// lib/src/widgets/map_marker_style.dart
 import 'package:flutter/material.dart';
 
-/// Estilos e constantes para os marcadores do mapa
 class MapMarkerStyle {
-  // ============================================
-  // Marcadores de eventos
-  // ============================================
   static const double markerWidth = 150.0;
   static const double markerHeight = 120.0;
 
-  /// Cores por categoria (id do interesse)
   static const Map<int, Color> categoryColors = {
-    1: Color(0xFFE91E63), // Música - rosa
-    2: Color(0xFF2196F3), // Tecnologia - azul
-    3: Color(0xFFFF9800), // Comida - laranja
-    4: Color(0xFF4CAF50), // Natureza - verde
-    5: Color(0xFF9C27B0), // Cultura - roxo
-    6: Color(0xFF00BCD4), // Viagem - ciano
-    7: Color(0xFF795548), // Estudar - marrom
-    8: Color(0xFF607D8B), // Outros - cinza azulado
+    1: Color(0xFFE91E63),
+    2: Color(0xFF2196F3),
+    3: Color(0xFFFF9800),
+    4: Color(0xFF4CAF50),
+    5: Color(0xFF9C27B0),
+    6: Color(0xFF00BCD4),
+    7: Color(0xFF795548),
+    8: Color(0xFF607D8B),
+    9: Color(0xFF3F51B5),
   };
 
   static const Color defaultCategoryColor = Color(0xFF607D8B);
@@ -26,25 +21,19 @@ class MapMarkerStyle {
   static const Color cardBackground = Colors.white;
   static const Color shadowColor = Colors.black26;
 
-  // Bordas
   static const double borderRadius = 12.0;
   static const double heatBadgeRadius = 16.0;
 
-  // Tipografia
   static const double titleFontSize = 13.0;
   static const double descriptionFontSize = 11.0;
   static const double heatFontSize = 10.0;
   static const int titleMaxLines = 1;
   static const int descriptionMaxLines = 2;
 
-  // Heat (intensidade)
   static const double lowHeatOpacity = 0.5;
   static const double mediumHeatOpacity = 0.75;
   static const double highHeatOpacity = 1.0;
 
-  // ============================================
-  // Marcador do usuário (posição atual)
-  // ============================================
   static const double userMarkerSize = 44.0;
   static const double userMarkerDotSize = 14.0;
   static const Color userMarkerColor = Color(0xFF2196F3); // azul
@@ -52,9 +41,6 @@ class MapMarkerStyle {
   static const double userMarkerBorderWidth = 3.0;
   static const double userMarkerPulseOpacity = 0.25;
 
-  // ============================================
-  // Helpers
-  // ============================================
   static Color getCategoryColor(int categoryId) {
     return categoryColors[categoryId] ?? defaultCategoryColor;
   }
@@ -83,6 +69,8 @@ class MapMarkerStyle {
         return Icons.school;
       case 8:
         return Icons.category;
+      case 9:
+        return Icons.sports_soccer;
       default:
         return Icons.place;
     }
@@ -106,6 +94,8 @@ class MapMarkerStyle {
         return 'Estudar';
       case 8:
         return 'Outros';
+      case 9:
+        return 'Esporte';
       default:
         return 'Outros';
     }
