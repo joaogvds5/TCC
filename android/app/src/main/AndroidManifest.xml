@@ -1,6 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     
-    <!-- Permissões -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -16,7 +15,6 @@
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="true">
         
-        <!-- ✅ ACTIVITY DO IMAGE_CROPPER (ADICIONE AQUI) -->
         <activity
             android:name="com.yalantis.ucrop.UCropActivity"
             android:screenOrientation="portrait"
@@ -37,7 +35,6 @@
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme" />
             
-            <!-- Deep Link: esquema principal -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -47,7 +44,6 @@
                     android:host="login-callback" />
             </intent-filter>
             
-            <!-- Deep Link: esquema alternativo -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -57,7 +53,6 @@
                     android:host="login-callback" />
             </intent-filter>
 
-            <!-- Deep Link: Supabase universal link -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -68,7 +63,6 @@
                     android:pathPrefix="/auth/v1/verify" />
             </intent-filter>
 
-            <!-- Launcher -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
