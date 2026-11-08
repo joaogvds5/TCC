@@ -8,16 +8,36 @@ class InterestService {
   InterestService({SupabaseClient? client})
     : _client = client ?? Supabase.instance.client;
 
+  static const String othersName = 'Outros';
+  static List<Interest> sortWithOthersLast(List<Interest> input) {
+    final list = List<Interest>.from(input);
+
+    list.sort((a, b) {
+      final aIsOthers = a.name.toLowerCase() == othersName.toLowerCase();
+      final bIsOthers = b.name.toLowerCase() == othersName.toLowerCase();
+
+      if (aIsOthers && !bIsOthers) return 1;
+      if (!aIsOthers && bIsOthers) return -1;
+      if (aIsOthers && bIsOthers) return 0;
+
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
+
+    return list;
+  }
+
   Future<List<Interest>> getAllInterests() async {
     try {
       final response = await _client
           .from('interest')
           .select()
-          .order('id', ascending: true);
+          .order('title', ascending: true);
 
-      return (response as List)
+      final list = (response as List)
           .map((e) => Interest.fromMap(Map<String, dynamic>.from(e)))
           .toList();
+
+      return sortWithOthersLast(list);
     } catch (e) {
       debugPrint('InterestService - erro ao listar interesses: $e');
       return [];
@@ -45,7 +65,7 @@ class InterestService {
           .select('interest_id, interest(id, title, icon)')
           .eq('user_id', userUuid);
 
-      return (response as List)
+      final list = (response as List)
           .map((item) {
             final data = item['interest'];
             if (data is Map<String, dynamic>) {
@@ -55,6 +75,8 @@ class InterestService {
           })
           .whereType<Interest>()
           .toList();
+
+      return sortWithOthersLast(list);
     } catch (e) {
       debugPrint('InterestService - erro ao buscar interesses completos: $e');
       return [];
