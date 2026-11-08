@@ -19,6 +19,8 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
+  static const int minAge = 18;
+
   late TextEditingController _nameController;
   late TextEditingController _bioController;
   late TextEditingController _phoneController;
@@ -46,29 +48,48 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
     _birthDate = widget.profile.birthDate;
 
-    _interestController = InterestController();
-    _interestController.addListener(_checkChanges);
-    _interestController.load(userUuid: widget.profile.userUuid).then((_) {
-      _initialInterestIds = Set<int>.from(_interestController.selectedIds);
-      _interestsLoaded = true;
-      _checkChanges();
-    });
-
     _nameController.addListener(_checkChanges);
     _bioController.addListener(_checkChanges);
     _phoneController.addListener(_checkChanges);
+
+    _interestController = InterestController();
+    _interestController.addListener(_onInterestChanged);
+    _loadInterests();
+  }
+
+  Future<void> _loadInterests() async {
+    try {
+      await _interestController.load(userUuid: widget.profile.userUuid);
+      _initialInterestIds = Set<int>.from(_interestController.selectedIds);
+    } catch (e) {
+      debugPrint('Erro ao carregar interesses: $e');
+      _initialInterestIds = {};
+    } finally {
+      if (!mounted) return;
+      setState(() => _interestsLoaded = true);
+      _checkChanges();
+    }
+  }
+
+  void _onInterestChanged() {
+    if (!mounted) return;
+    setState(() {});
+    _checkChanges();
   }
 
   bool _setEquals(Set<int> a, Set<int> b) =>
       a.length == b.length && a.containsAll(b);
 
+  bool _hasOtherChanges() =>
+      _nameController.text != widget.profile.name ||
+      _bioController.text != (widget.profile.biography ?? '') ||
+      _phoneController.text != (widget.profile.telephone ?? '') ||
+      _birthDate != widget.profile.birthDate ||
+      _imageFile != null;
+
   void _checkChanges() {
     final hasChanges =
-        _nameController.text != widget.profile.name ||
-        _bioController.text != (widget.profile.biography ?? '') ||
-        _phoneController.text != (widget.profile.telephone ?? '') ||
-        _birthDate != widget.profile.birthDate ||
-        _imageFile != null ||
+        _hasOtherChanges() ||
         (_interestsLoaded &&
             !_setEquals(_initialInterestIds, _interestController.selectedIds));
 
@@ -82,7 +103,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nameController.removeListener(_checkChanges);
     _bioController.removeListener(_checkChanges);
     _phoneController.removeListener(_checkChanges);
-    _interestController.removeListener(_checkChanges);
+    _interestController.removeListener(_onInterestChanged);
     _interestController.dispose();
     _nameController.dispose();
     _bioController.dispose();
@@ -167,8 +188,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  static const int minAge = 18;
-
   Future<void> _pickDate() async {
     final now = DateTime.now();
     final lastAllowed = DateTime(now.year - minAge, now.month, now.day);
@@ -177,7 +196,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       context: context,
       initialDate: _birthDate ?? DateTime(now.year - 20, now.month, now.day),
       firstDate: DateTime(1900),
-      lastDate: lastAllowed, // 👈 não deixa escolher < 18 anos
+      lastDate: lastAllowed,
       helpText: 'Você precisa ter pelo menos $minAge anos',
     );
 
@@ -201,46 +220,26 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   Future<void> _saveProfile() async {
     if (_nameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Nome é obrigatório'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showSnack('Nome é obrigatório', isError: true);
       return;
     }
 
-    // ---------- Validação de idade mínima ----------
     if (_birthDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Data de nascimento é obrigatória'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showSnack('Data de nascimento é obrigatória', isError: true);
       return;
     }
 
     if (_birthDate!.isAfter(DateTime.now())) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Data de nascimento não pode ser no futuro'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showSnack('Data de nascimento não pode ser no futuro', isError: true);
       return;
     }
 
     final age = _ageFromBirthDate(_birthDate!);
     if (age < minAge) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'É necessário ter pelo menos $minAge anos. '
-            'Idade informada: $age ${age == 1 ? "ano" : "anos"}.',
-          ),
-          backgroundColor: Colors.red,
-        ),
+      _showSnack(
+        'É necessário ter pelo menos $minAge anos. '
+        'Idade informada: $age ${age == 1 ? "ano" : "anos"}.',
+        isError: true,
       );
       return;
     }
@@ -272,12 +271,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           throw Exception('Erro ao fazer upload da foto');
         }
       }
-
       if (_interestsLoaded &&
           !_setEquals(_initialInterestIds, _interestController.selectedIds)) {
         final okInterests = await _interestController.save(userUuid: userUuid);
         if (!okInterests) {
-          throw Exception('Erro ao salvar interesses');
+          throw Exception(
+            _interestController.error ?? 'Erro ao salvar interesses',
+          );
         }
         _initialInterestIds = Set<int>.from(_interestController.selectedIds);
       }
@@ -296,34 +296,28 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (!mounted) return;
 
       if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Perfil atualizado!'),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        _showSnack('Perfil atualizado!', isError: false);
         Navigator.pop(context, true);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_controller.error ?? 'Erro ao salvar'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showSnack(_controller.error ?? 'Erro ao salvar', isError: true);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showSnack('Erro: ${e.toString()}', isError: true);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _showSnack(String msg, {required bool isError}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: isError ? Colors.red : Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
@@ -348,6 +342,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
+            // Foto
             Center(
               child: GestureDetector(
                 onTap: _pickImage,
@@ -454,11 +449,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
             ),
             const SizedBox(height: 4),
-            Padding(
-              padding: const EdgeInsets.only(left: 4),
-              child: Text(
-                'É necessário ter pelo menos $minAge anos.',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: Text(
+                  'É necessário ter pelo menos $minAge anos.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                ),
               ),
             ),
 
@@ -479,7 +477,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
             const SizedBox(height: 24),
 
-            // ===== Interesses =====
             Row(
               children: [
                 Icon(
