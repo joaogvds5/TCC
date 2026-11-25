@@ -1,16 +1,22 @@
-# nearu
+NearU
+Aplicativo móvel em Flutter para descobrir, criar e participar de eventos próximos, com mapa interativo.
 
-A new Flutter project.
+TCC — Engenharia de Software.
 
-## Getting Started
+Funcionalidades
+Mapa interativo com eventos geolocalizados
 
-This project is a starting point for a Flutter application.
+Localização em tempo real
 
-A few resources to get you started if this is your first Flutter project:
+Criação de eventos com foto e categoria
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+Participação em eventos
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Chat por evento em tempo real
+
+Perfil com interesses personalizados
+
+Autenticação com e-mail e senha
+
+Tecnologias
+Flutter · Dart · Supabase · flutter_map · geolocator · OpenStreetMap
