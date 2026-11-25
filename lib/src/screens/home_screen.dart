@@ -23,6 +23,7 @@ class _MyHomePageState extends State<MyHomePage> {
   final HomeController controller = HomeController();
   final MapController mapController = MapController();
   bool _isRefreshing = false;
+  double _currentZoom = 14.0;
 
   @override
   void initState() {
@@ -174,6 +175,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
     final eventMarkers = MapMarkersBuilder.build(
       controller.clusters,
+      currentZoom: _currentZoom,
       onMarkerTap: _openEventDetail,
     );
 
@@ -226,6 +228,11 @@ class _MyHomePageState extends State<MyHomePage> {
             controller: mapController,
             center: controller.currentLatLng,
             markers: allMarkers,
+            onPositionChanged: (camera) {
+              if (camera.zoom != _currentZoom) {
+                setState(() => _currentZoom = camera.zoom);
+              }
+            },
           ),
           Positioned(
             bottom: 16,

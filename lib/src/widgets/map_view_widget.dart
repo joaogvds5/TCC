@@ -8,6 +8,7 @@ class MapView extends StatelessWidget {
   final List<Marker> markers;
   final List<Polyline>? polylines;
   final List<Polygon>? polygons;
+  final void Function(MapCamera camera)? onPositionChanged;
 
   const MapView({
     super.key,
@@ -16,6 +17,7 @@ class MapView extends StatelessWidget {
     required this.markers,
     this.polylines,
     this.polygons,
+    this.onPositionChanged,
   });
 
   @override
@@ -30,13 +32,15 @@ class MapView extends StatelessWidget {
         interactionOptions: const InteractionOptions(
           flags: InteractiveFlag.all,
         ),
+        onPositionChanged: (camera, hasGesture) {
+          onPositionChanged?.call(camera);
+        },
       ),
       children: [
         // mapa base
         TileLayer(
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
           userAgentPackageName: 'com.nearu.app',
-          // Cache e fallback
           errorImage: const AssetImage('assets/map_error.png'),
         ),
         MarkerLayer(markers: markers),
